@@ -126,4 +126,6 @@ def delete_media(media_id):
 if __name__ == '__main__':
     if not os.path.exists(DATABASE):
         init_db()
-    app.run(debug=True)
+    # Debug mode should only be enabled during development
+    # Set to False for production deployment
+    app.run(debug=False)
