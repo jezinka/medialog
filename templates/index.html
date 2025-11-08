@@ -63,19 +63,7 @@
                     <option value="{{ year }}">{{ year }}</option>
                 </select>
                 <select id="summaryMonth">
-                    <option value="">Cały rok</option>
-                    <option value="1">Styczeń</option>
-                    <option value="2">Luty</option>
-                    <option value="3">Marzec</option>
-                    <option value="4">Kwiecień</option>
-                    <option value="5">Maj</option>
-                    <option value="6">Czerwiec</option>
-                    <option value="7">Lipiec</option>
-                    <option value="8">Sierpień</option>
-                    <option value="9">Wrzesień</option>
-                    <option value="10">Październik</option>
-                    <option value="11">Listopad</option>
-                    <option value="12">Grudzień</option>
+                    <!-- Options populated dynamically by JavaScript -->
                 </select>
                 <button class="summary-btn" onclick="generateSummary()">Generuj podsumowanie</button>
             </div>
@@ -103,6 +91,32 @@
     <script>
         let currentYear = {{ year }};
         let allMedia = [];
+
+        // Centralized month names (Polish localization)
+        const MONTH_NAMES = [
+            'Styczeń', 'Luty', 'Marzec', 'Kwiecień', 'Maj', 'Czerwiec',
+            'Lipiec', 'Sierpień', 'Wrzesień', 'Październik', 'Listopad', 'Grudzień'
+        ];
+
+        // Toast notification system
+        function showToast(message, type = 'success') {
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            
+            const icon = type === 'success' ? '✓' : '✗';
+            
+            toast.innerHTML = `
+                <span class="toast-icon">${icon}</span>
+                <span class="toast-message">${message}</span>
+                <button class="toast-close" onclick="this.parentElement.remove()">×</button>
+            `;
+            
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.remove();
+            }, 3000);
+        }
 
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', function() {
@@ -137,6 +151,17 @@
                 }
                 yearSelect.appendChild(option);
             }
+
+            // Populate month dropdown
+            const monthSelect = document.getElementById('summaryMonth');
+            monthSelect.innerHTML = '<option value="">Cały rok</option>';
+            
+            MONTH_NAMES.forEach((monthName, index) => {
+                const option = document.createElement('option');
+                option.value = index + 1;
+                option.textContent = monthName;
+                monthSelect.appendChild(option);
+            });
         }
 
         function changeYear(offset) {
@@ -213,9 +238,7 @@
                 return sum + days;
             }, 0);
             
-            const monthNames = ['', 'Styczeń', 'Luty', 'Marzec', 'Kwiecień', 'Maj', 'Czerwiec', 
-                              'Lipiec', 'Sierpień', 'Wrzesień', 'Październik', 'Listopad', 'Grudzień'];
-            const periodText = month ? `${monthNames[month]} ${year}` : `Rok ${year}`;
+            const periodText = month ? `${MONTH_NAMES[month - 1]} ${year}` : `Rok ${year}`;
             
             let html = `<h3 style="margin-bottom: 15px;">Podsumowanie: ${periodText}</h3>`;
             html += '<div class="summary-grid">';
@@ -288,18 +311,13 @@
             const container = document.getElementById(elementId);
             container.innerHTML = '';
             
-            const months = [
-                'Styczeń', 'Luty', 'Marzec', 'Kwiecień', 'Maj', 'Czerwiec',
-                'Lipiec', 'Sierpień', 'Wrzesień', 'Październik', 'Listopad', 'Grudzień'
-            ];
-            
             for (let month = 0; month < 12; month++) {
                 const monthDiv = document.createElement('div');
                 monthDiv.className = 'month';
                 
                 const monthHeader = document.createElement('div');
                 monthHeader.className = 'month-header';
-                monthHeader.textContent = months[month];
+                monthHeader.textContent = MONTH_NAMES[month];
                 monthDiv.appendChild(monthHeader);
                 
                 const daysGrid = document.createElement('div');
@@ -442,16 +460,16 @@
                 });
                 
                 if (response.ok) {
-                    alert('Pozycja została dodana!');
+                    showToast('Pozycja została dodana!', 'success');
                     this.reset();
                     loadMedia();
                 } else {
                     const error = await response.json();
-                    alert('Błąd: ' + error.error);
+                    showToast('Błąd: ' + error.error, 'error');
                 }
             } catch (error) {
                 console.error('Error adding media:', error);
-                alert('Wystąpił błąd podczas dodawania pozycji.');
+                showToast('Wystąpił błąd podczas dodawania pozycji.', 'error');
             }
         });
 
@@ -466,14 +484,14 @@
                 });
                 
                 if (response.ok) {
-                    alert('Pozycja została usunięta!');
+                    showToast('Pozycja została usunięta!', 'success');
                     loadMedia();
                 } else {
-                    alert('Błąd podczas usuwania pozycji.');
+                    showToast('Błąd podczas usuwania pozycji.', 'error');
                 }
             } catch (error) {
                 console.error('Error deleting media:', error);
-                alert('Wystąpił błąd podczas usuwania pozycji.');
+                showToast('Wystąpił błąd podczas usuwania pozycji.', 'error');
             }
         }
     </script>
