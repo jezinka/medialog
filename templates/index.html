@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Media Log - Dziennik Książek i Seriali</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Media Log - {{ year }}</h1>
+            <div class="year-navigation">
+                <button onclick="changeYear(-1)">← {{ year - 1 }}</button>
+                <button onclick="changeYear(0)">Bieżący rok</button>
+                <button onclick="changeYear(1)">{{ year + 1 }} →</button>
+            </div>
+        </header>
+
+        <div class="add-media-section">
+            <h2>Dodaj nową pozycję</h2>
+            <form id="addMediaForm">
+                <div class="form-group">
+                    <label for="title">Tytuł:</label>
+                    <input type="text" id="title" name="title" required>
+                </div>
+                <div class="form-group">
+                    <label for="mediaType">Typ:</label>
+                    <select id="mediaType" name="mediaType" required>
+                        <option value="book">Książka</option>
+                        <option value="series">Serial/Film</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="startDate">Data rozpoczęcia:</label>
+                    <input type="date" id="startDate" name="startDate" required>
+                </div>
+                <div class="form-group">
+                    <label for="endDate">Data zakończenia:</label>
+                    <input type="date" id="endDate" name="endDate" required>
+                </div>
+                <div class="form-group">
+                    <label for="notes">Notatki (opcjonalne):</label>
+                    <textarea id="notes" name="notes" rows="3"></textarea>
+                </div>
+                <button type="submit" class="submit-btn">Dodaj</button>
+            </form>
+        </div>
+
+        <div class="calendars-container">
+            <div class="calendar-section">
+                <h2>📚 Książki</h2>
+                <div id="booksCalendar" class="calendar"></div>
+            </div>
+
+            <div class="calendar-section">
+                <h2>🎬 Seriale i Filmy</h2>
+                <div id="seriesCalendar" class="calendar"></div>
+            </div>
+        </div>
+
+        <div class="media-list-section">
+            <h2>Lista pozycji</h2>
+            <div id="mediaList"></div>
+        </div>
+    </div>
+
+    <script>
+        let currentYear = {{ year }};
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadMedia();
+        });
+
+        function changeYear(offset) {
+            if (offset === 0) {
+                currentYear = new Date().getFullYear();
+            } else {
+                currentYear += offset;
+            }
+            window.location.href = `/?year=${currentYear}`;
+        }
+
+        async function loadMedia() {
+            try {
+                const response = await fetch(`/api/media?year=${currentYear}`);
+                const media = await response.json();
+                
+                renderCalendars(media);
+                renderMediaList(media);
+            } catch (error) {
+                console.error('Error loading media:', error);
+            }
+        }
+
+        function renderCalendars(media) {
+            const books = media.filter(m => m.media_type === 'book');
+            const series = media.filter(m => m.media_type === 'series');
+            
+            renderCalendar('booksCalendar', books, currentYear);
+            renderCalendar('seriesCalendar', series, currentYear);
+        }
+
+        function renderCalendar(elementId, mediaItems, year) {
+            const container = document.getElementById(elementId);
+            container.innerHTML = '';
+            
+            const months = [
+                'Styczeń', 'Luty', 'Marzec', 'Kwiecień', 'Maj', 'Czerwiec',
+                'Lipiec', 'Sierpień', 'Wrzesień', 'Październik', 'Listopad', 'Grudzień'
+            ];
+            
+            for (let month = 0; month < 12; month++) {
+                const monthDiv = document.createElement('div');
+                monthDiv.className = 'month';
+                
+                const monthHeader = document.createElement('div');
+                monthHeader.className = 'month-header';
+                monthHeader.textContent = months[month];
+                monthDiv.appendChild(monthHeader);
+                
+                const daysGrid = document.createElement('div');
+                daysGrid.className = 'days-grid';
+                
+                const daysInMonth = new Date(year, month + 1, 0).getDate();
+                const firstDay = new Date(year, month, 1).getDay();
+                const startDay = firstDay === 0 ? 6 : firstDay - 1; // Monday = 0
+                
+                // Add day headers
+                const dayHeaders = ['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'So', 'Nd'];
+                dayHeaders.forEach(day => {
+                    const dayHeader = document.createElement('div');
+                    dayHeader.className = 'day-header';
+                    dayHeader.textContent = day;
+                    daysGrid.appendChild(dayHeader);
+                });
+                
+                // Add empty cells for days before month starts
+                for (let i = 0; i < startDay; i++) {
+                    const emptyDay = document.createElement('div');
+                    emptyDay.className = 'day empty';
+                    daysGrid.appendChild(emptyDay);
+                }
+                
+                // Add days
+                for (let day = 1; day <= daysInMonth; day++) {
+                    const dayDiv = document.createElement('div');
+                    dayDiv.className = 'day';
+                    dayDiv.textContent = day;
+                    
+                    const currentDate = new Date(year, month, day);
+                    const dateStr = currentDate.toISOString().split('T')[0];
+                    
+                    // Check if this day is covered by any media item
+                    const mediaOnDay = mediaItems.filter(item => {
+                        const start = new Date(item.start_date);
+                        const end = new Date(item.end_date);
+                        return currentDate >= start && currentDate <= end;
+                    });
+                    
+                    if (mediaOnDay.length > 0) {
+                        dayDiv.classList.add('has-media');
+                        dayDiv.title = mediaOnDay.map(m => m.title).join(', ');
+                    }
+                    
+                    daysGrid.appendChild(dayDiv);
+                }
+                
+                monthDiv.appendChild(daysGrid);
+                container.appendChild(monthDiv);
+            }
+        }
+
+        function renderMediaList(media) {
+            const container = document.getElementById('mediaList');
+            container.innerHTML = '';
+            
+            if (media.length === 0) {
+                container.innerHTML = '<p class="empty-message">Brak wpisów w tym roku.</p>';
+                return;
+            }
+            
+            const books = media.filter(m => m.media_type === 'book');
+            const series = media.filter(m => m.media_type === 'series');
+            
+            if (books.length > 0) {
+                const booksSection = document.createElement('div');
+                booksSection.className = 'media-category';
+                booksSection.innerHTML = '<h3>📚 Książki</h3>';
+                books.forEach(item => {
+                    booksSection.appendChild(createMediaItem(item));
+                });
+                container.appendChild(booksSection);
+            }
+            
+            if (series.length > 0) {
+                const seriesSection = document.createElement('div');
+                seriesSection.className = 'media-category';
+                seriesSection.innerHTML = '<h3>🎬 Seriale i Filmy</h3>';
+                series.forEach(item => {
+                    seriesSection.appendChild(createMediaItem(item));
+                });
+                container.appendChild(seriesSection);
+            }
+        }
+
+        function createMediaItem(item) {
+            const div = document.createElement('div');
+            div.className = 'media-item';
+            
+            const content = `
+                <div class="media-item-header">
+                    <strong>${item.title}</strong>
+                    <button onclick="deleteMedia(${item.id})" class="delete-btn">Usuń</button>
+                </div>
+                <div class="media-item-details">
+                    <span>Od: ${formatDate(item.start_date)}</span>
+                    <span>Do: ${formatDate(item.end_date)}</span>
+                    <span>${calculateDays(item.start_date, item.end_date)} dni</span>
+                </div>
+                ${item.notes ? `<div class="media-item-notes">${item.notes}</div>` : ''}
+            `;
+            
+            div.innerHTML = content;
+            return div;
+        }
+
+        function formatDate(dateStr) {
+            const date = new Date(dateStr);
+            return date.toLocaleDateString('pl-PL');
+        }
+
+        function calculateDays(startStr, endStr) {
+            const start = new Date(startStr);
+            const end = new Date(endStr);
+            const diffTime = Math.abs(end - start);
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+            return diffDays;
+        }
+
+        document.getElementById('addMediaForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = {
+                title: document.getElementById('title').value,
+                media_type: document.getElementById('mediaType').value,
+                start_date: document.getElementById('startDate').value,
+                end_date: document.getElementById('endDate').value,
+                notes: document.getElementById('notes').value
+            };
+            
+            try {
+                const response = await fetch('/api/media', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(formData)
+                });
+                
+                if (response.ok) {
+                    alert('Pozycja została dodana!');
+                    this.reset();
+                    loadMedia();
+                } else {
+                    const error = await response.json();
+                    alert('Błąd: ' + error.error);
+                }
+            } catch (error) {
+                console.error('Error adding media:', error);
+                alert('Wystąpił błąd podczas dodawania pozycji.');
+            }
+        });
+
+        async function deleteMedia(id) {
+            if (!confirm('Czy na pewno chcesz usunąć tę pozycję?')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/media/${id}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    alert('Pozycja została usunięta!');
+                    loadMedia();
+                } else {
+                    alert('Błąd podczas usuwania pozycji.');
+                }
+            } catch (error) {
+                console.error('Error deleting media:', error);
+                alert('Wystąpił błąd podczas usuwania pozycji.');
+            }
+        }
+    </script>
+</body>
+</html>
