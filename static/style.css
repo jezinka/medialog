@@ -93,6 +93,16 @@ header h1 {
     max-height: 500px;
 }
 
+.summary-container {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease-out;
+}
+
+.summary-container.expanded {
+    max-height: 2000px;
+}
+
 .form-group {
     margin-bottom: 10px;
 }

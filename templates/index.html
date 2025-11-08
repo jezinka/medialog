@@ -57,17 +57,22 @@
         </div>
 
         <div class="summary-section">
-            <h2>📊 Podsumowanie</h2>
-            <div class="summary-controls">
-                <select id="summaryYear">
-                    <option value="{{ year }}">{{ year }}</option>
-                </select>
-                <select id="summaryMonth">
-                    <!-- Options populated dynamically by JavaScript -->
-                </select>
-                <button class="summary-btn" onclick="generateSummary()">Generuj podsumowanie</button>
+            <h2 onclick="toggleSummary()" style="cursor: pointer;">
+                📊 Podsumowanie 
+                <span class="toggle-icon" id="summaryToggleIcon">▼</span>
+            </h2>
+            <div class="summary-container" id="summaryContainer">
+                <div class="summary-controls">
+                    <select id="summaryYear">
+                        <option value="{{ year }}">{{ year }}</option>
+                    </select>
+                    <select id="summaryMonth">
+                        <!-- Options populated dynamically by JavaScript -->
+                    </select>
+                    <button class="summary-btn" onclick="generateSummary()">Generuj podsumowanie</button>
+                </div>
+                <div id="summaryContent"></div>
             </div>
-            <div id="summaryContent"></div>
         </div>
 
         <div class="calendars-container">
@@ -127,6 +132,19 @@
         function toggleForm() {
             const container = document.getElementById('formContainer');
             const icon = document.getElementById('toggleIcon');
+            
+            if (container.classList.contains('expanded')) {
+                container.classList.remove('expanded');
+                icon.classList.add('collapsed');
+            } else {
+                container.classList.add('expanded');
+                icon.classList.remove('collapsed');
+            }
+        }
+
+        function toggleSummary() {
+            const container = document.getElementById('summaryContainer');
+            const icon = document.getElementById('summaryToggleIcon');
             
             if (container.classList.contains('expanded')) {
                 container.classList.remove('expanded');
