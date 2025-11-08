@@ -18,33 +18,68 @@
         </header>
 
         <div class="add-media-section">
-            <h2>Dodaj nową pozycję</h2>
-            <form id="addMediaForm">
-                <div class="form-group">
-                    <label for="title">Tytuł:</label>
-                    <input type="text" id="title" name="title" required>
-                </div>
-                <div class="form-group">
-                    <label for="mediaType">Typ:</label>
-                    <select id="mediaType" name="mediaType" required>
-                        <option value="book">Książka</option>
-                        <option value="series">Serial/Film</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="startDate">Data rozpoczęcia:</label>
-                    <input type="date" id="startDate" name="startDate" required>
-                </div>
-                <div class="form-group">
-                    <label for="endDate">Data zakończenia:</label>
-                    <input type="date" id="endDate" name="endDate" required>
-                </div>
-                <div class="form-group">
-                    <label for="notes">Notatki (opcjonalne):</label>
-                    <textarea id="notes" name="notes" rows="3"></textarea>
-                </div>
-                <button type="submit" class="submit-btn">Dodaj</button>
-            </form>
+            <h2 onclick="toggleForm()">
+                Dodaj nową pozycję 
+                <span class="toggle-icon" id="toggleIcon">▼</span>
+            </h2>
+            <div class="form-container" id="formContainer">
+                <form id="addMediaForm">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="title">Tytuł:</label>
+                            <input type="text" id="title" name="title" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="mediaType">Typ:</label>
+                            <select id="mediaType" name="mediaType" required>
+                                <option value="book">Książka</option>
+                                <option value="series">Serial/Film</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="startDate">Data rozpoczęcia:</label>
+                            <input type="date" id="startDate" name="startDate" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="endDate">Data zakończenia:</label>
+                            <input type="date" id="endDate" name="endDate" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="notes">Notatki (opcjonalne):</label>
+                        <textarea id="notes" name="notes" rows="2"></textarea>
+                    </div>
+                    <button type="submit" class="submit-btn">Dodaj</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="summary-section">
+            <h2>📊 Podsumowanie</h2>
+            <div class="summary-controls">
+                <select id="summaryYear">
+                    <option value="{{ year }}">{{ year }}</option>
+                </select>
+                <select id="summaryMonth">
+                    <option value="">Cały rok</option>
+                    <option value="1">Styczeń</option>
+                    <option value="2">Luty</option>
+                    <option value="3">Marzec</option>
+                    <option value="4">Kwiecień</option>
+                    <option value="5">Maj</option>
+                    <option value="6">Czerwiec</option>
+                    <option value="7">Lipiec</option>
+                    <option value="8">Sierpień</option>
+                    <option value="9">Wrzesień</option>
+                    <option value="10">Październik</option>
+                    <option value="11">Listopad</option>
+                    <option value="12">Grudzień</option>
+                </select>
+                <button class="summary-btn" onclick="generateSummary()">Generuj podsumowanie</button>
+            </div>
+            <div id="summaryContent"></div>
         </div>
 
         <div class="calendars-container">
@@ -67,11 +102,42 @@
 
     <script>
         let currentYear = {{ year }};
+        let allMedia = [];
 
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', function() {
             loadMedia();
+            populateYearDropdown();
         });
+
+        function toggleForm() {
+            const container = document.getElementById('formContainer');
+            const icon = document.getElementById('toggleIcon');
+            
+            if (container.classList.contains('expanded')) {
+                container.classList.remove('expanded');
+                icon.classList.add('collapsed');
+            } else {
+                container.classList.add('expanded');
+                icon.classList.remove('collapsed');
+            }
+        }
+
+        function populateYearDropdown() {
+            const yearSelect = document.getElementById('summaryYear');
+            const currentYear = new Date().getFullYear();
+            yearSelect.innerHTML = '';
+            
+            for (let year = currentYear - 5; year <= currentYear + 1; year++) {
+                const option = document.createElement('option');
+                option.value = year;
+                option.textContent = year;
+                if (year === currentYear) {
+                    option.selected = true;
+                }
+                yearSelect.appendChild(option);
+            }
+        }
 
         function changeYear(offset) {
             if (offset === 0) {
@@ -85,13 +151,129 @@
         async function loadMedia() {
             try {
                 const response = await fetch(`/api/media?year=${currentYear}`);
-                const media = await response.json();
+                allMedia = await response.json();
                 
-                renderCalendars(media);
-                renderMediaList(media);
+                renderCalendars(allMedia);
+                renderMediaList(allMedia);
             } catch (error) {
                 console.error('Error loading media:', error);
             }
+        }
+
+        async function generateSummary() {
+            const year = document.getElementById('summaryYear').value;
+            const month = document.getElementById('summaryMonth').value;
+            
+            try {
+                const response = await fetch(`/api/media?year=${year}`);
+                const media = await response.json();
+                
+                let filteredMedia = media;
+                if (month) {
+                    filteredMedia = media.filter(item => {
+                        const startDate = new Date(item.start_date);
+                        const endDate = new Date(item.end_date);
+                        const monthInt = parseInt(month);
+                        
+                        // Check if the media was consumed during the selected month
+                        return (startDate.getMonth() + 1 <= monthInt && endDate.getMonth() + 1 >= monthInt &&
+                                startDate.getFullYear() == year && endDate.getFullYear() == year) ||
+                               (startDate.getMonth() + 1 == monthInt || endDate.getMonth() + 1 == monthInt);
+                    });
+                }
+                
+                displaySummary(filteredMedia, year, month);
+            } catch (error) {
+                console.error('Error generating summary:', error);
+            }
+        }
+
+        function displaySummary(media, year, month) {
+            const container = document.getElementById('summaryContent');
+            
+            if (media.length === 0) {
+                container.innerHTML = '<p style="text-align: center; opacity: 0.8;">Brak danych do wyświetlenia</p>';
+                return;
+            }
+            
+            const books = media.filter(m => m.media_type === 'book');
+            const series = media.filter(m => m.media_type === 'series');
+            
+            const totalDaysBooks = books.reduce((sum, item) => {
+                const start = new Date(item.start_date);
+                const end = new Date(item.end_date);
+                const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+                return sum + days;
+            }, 0);
+            
+            const totalDaysSeries = series.reduce((sum, item) => {
+                const start = new Date(item.start_date);
+                const end = new Date(item.end_date);
+                const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+                return sum + days;
+            }, 0);
+            
+            const monthNames = ['', 'Styczeń', 'Luty', 'Marzec', 'Kwiecień', 'Maj', 'Czerwiec', 
+                              'Lipiec', 'Sierpień', 'Wrzesień', 'Październik', 'Listopad', 'Grudzień'];
+            const periodText = month ? `${monthNames[month]} ${year}` : `Rok ${year}`;
+            
+            let html = `<h3 style="margin-bottom: 15px;">Podsumowanie: ${periodText}</h3>`;
+            html += '<div class="summary-grid">';
+            html += `
+                <div class="summary-item">
+                    <div class="summary-item-value">${books.length}</div>
+                    <div class="summary-item-label">Przeczytanych książek</div>
+                </div>
+                <div class="summary-item">
+                    <div class="summary-item-value">${series.length}</div>
+                    <div class="summary-item-label">Obejrzanych seriali/filmów</div>
+                </div>
+                <div class="summary-item">
+                    <div class="summary-item-value">${totalDaysBooks}</div>
+                    <div class="summary-item-label">Dni czytania</div>
+                </div>
+                <div class="summary-item">
+                    <div class="summary-item-value">${totalDaysSeries}</div>
+                    <div class="summary-item-label">Dni oglądania</div>
+                </div>
+            `;
+            html += '</div>';
+            
+            if (books.length > 0) {
+                html += '<div class="summary-list">';
+                html += '<h4 style="margin-bottom: 10px;">📚 Książki:</h4>';
+                books.forEach(book => {
+                    const start = new Date(book.start_date);
+                    const end = new Date(book.end_date);
+                    const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+                    html += `
+                        <div class="summary-list-item">
+                            <span class="summary-list-title">${book.title}</span>
+                            <span class="summary-list-days">${days} dni</span>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+            }
+            
+            if (series.length > 0) {
+                html += '<div class="summary-list">';
+                html += '<h4 style="margin-bottom: 10px;">🎬 Seriale i Filmy:</h4>';
+                series.forEach(item => {
+                    const start = new Date(item.start_date);
+                    const end = new Date(item.end_date);
+                    const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+                    html += `
+                        <div class="summary-list-item">
+                            <span class="summary-list-title">${item.title}</span>
+                            <span class="summary-list-days">${days} dni</span>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+            }
+            
+            container.innerHTML = html;
         }
 
         function renderCalendars(media) {
