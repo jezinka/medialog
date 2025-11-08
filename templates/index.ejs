@@ -4,16 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Media Log - Dziennik Książek i Seriali</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="/style.css">
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>Media Log - {{ year }}</h1>
+            <h1>Media Log - <%= year %></h1>
             <div class="year-navigation">
-                <button onclick="changeYear(-1)">← {{ year - 1 }}</button>
+                <button onclick="changeYear(-1)">← <%= year - 1 %></button>
                 <button onclick="changeYear(0)">Bieżący rok</button>
-                <button onclick="changeYear(1)">{{ year + 1 }} →</button>
+                <button onclick="changeYear(1)"><%= year + 1 %> →</button>
             </div>
         </header>
 
@@ -64,7 +64,7 @@
             <div class="summary-container" id="summaryContainer">
                 <div class="summary-controls">
                     <select id="summaryYear">
-                        <option value="{{ year }}">{{ year }}</option>
+                        <option value="<%= year %>"><%= year %></option>
                     </select>
                     <select id="summaryMonth">
                         <!-- Options populated dynamically by JavaScript -->
@@ -94,7 +94,7 @@
     </div>
 
     <script>
-        let currentYear = {{ year }};
+        let currentYear = <%= year %>;
         let allMedia = [];
 
         // Centralized month names (Polish localization)

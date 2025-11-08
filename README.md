@@ -14,10 +14,11 @@ Aplikacja webowa do śledzenia konsumpcji mediów - książek, seriali i filmów
 
 ## Stack technologiczny
 
-- **Backend**: Python + Flask
+- **Backend**: Node.js + Express
 - **Baza danych**: SQLite
 - **Frontend**: HTML, CSS, JavaScript (vanilla)
-- **Template Engine**: Jinja2
+- **Template Engine**: EJS
+- **Testing**: Jest + Supertest
 
 ## Instalacja
 
@@ -29,19 +30,36 @@ cd medialog
 
 2. Zainstaluj wymagane biblioteki:
 ```bash
-pip install -r requirements.txt
+npm install
 ```
 
 ## Uruchomienie
 
 1. Uruchom aplikację:
 ```bash
-python app.py
+npm start
+```
+
+Lub w trybie deweloperskim z automatycznym restartowaniem:
+```bash
+npm run dev
 ```
 
 2. Otwórz przeglądarkę i przejdź do:
 ```
 http://localhost:5000
+```
+
+## Testy
+
+Uruchom testy jednostkowe:
+```bash
+npm test
+```
+
+Uruchom testy w trybie watch:
+```bash
+npm run test:watch
 ```
 
 ## Użytkowanie
@@ -69,8 +87,10 @@ http://localhost:5000
 
 ```
 medialog/
-├── app.py              # Główna aplikacja Flask
-├── requirements.txt    # Zależności Python
+├── server.js           # Główna aplikacja Express
+├── package.json        # Zależności Node.js
+├── __tests__/
+│   └── server.test.js # Testy jednostkowe
 ├── templates/
 │   └── index.html     # Szablon strony głównej
 ├── static/
