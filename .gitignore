@@ -26,6 +26,15 @@ package-lock.json
 coverage/
 .nyc_output/
 
+# Logs
+logs/
+*.log
+
+# Environment
+.env
+.env.local
+.env.*.local
+
 # OS
 .DS_Store
 Thumbs.db
