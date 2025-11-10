@@ -37,13 +37,40 @@ beforeAll(async () => {
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     `);
-    
+
+    // Create tags tables for many-to-many relationship
+    await db.exec(`
+        CREATE TABLE IF NOT EXISTS tags (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    `);
+
+    await db.exec(`
+        CREATE TABLE IF NOT EXISTS media_tags (
+            media_id INTEGER NOT NULL,
+            tag_id INTEGER NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (media_id, tag_id),
+            FOREIGN KEY (media_id) REFERENCES media(id) ON DELETE CASCADE,
+            FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE
+        )
+    `);
+
+    // Create indices
+    await db.exec(`CREATE INDEX IF NOT EXISTS idx_media_tags_media ON media_tags(media_id)`);
+    await db.exec(`CREATE INDEX IF NOT EXISTS idx_media_tags_tag ON media_tags(tag_id)`);
+    await db.exec(`CREATE INDEX IF NOT EXISTS idx_tags_name ON tags(name)`);
+
     // Set database for the server
     setDb(db);
 });
 
 beforeEach(async () => {
     // Clear database before each test
+    await db.run('DELETE FROM media_tags');
+    await db.run('DELETE FROM tags');
     await db.run('DELETE FROM media');
 });
 
@@ -482,6 +509,162 @@ describe('Media Log API', () => {
 
             expect(inProgressEntry).toBeDefined();
             expect(inProgressEntry.end_date).toBeNull();
+        });
+    });
+
+    describe('Tag Management', () => {
+        it('should create tags from comma-separated string', async () => {
+            const response = await request(app)
+                .post('/api/media')
+                .send({
+                    title: 'Tagged Book',
+                    media_type: 'book',
+                    start_date: '2025-01-01',
+                    end_date: '2025-01-10',
+                    tags: 'fantasy, adventure, bestseller'
+                });
+
+            expect(response.status).toBe(201);
+
+            // Verify tags were created
+            const mediaResponse = await request(app).get('/api/media?year=2025');
+            const book = mediaResponse.body.find(e => e.title === 'Tagged Book');
+            expect(book.tags).toBeTruthy();
+            expect(book.tags.split(', ').sort()).toEqual(['adventure', 'bestseller', 'fantasy']);
+        });
+
+        it('should handle duplicate tags', async () => {
+            // Create first entry with tags
+            await request(app)
+                .post('/api/media')
+                .send({
+                    title: 'Book 1',
+                    media_type: 'book',
+                    start_date: '2025-01-01',
+                    end_date: '2025-01-10',
+                    tags: 'fantasy, adventure'
+                });
+
+            // Create second entry with overlapping tags
+            const response = await request(app)
+                .post('/api/media')
+                .send({
+                    title: 'Book 2',
+                    media_type: 'book',
+                    start_date: '2025-02-01',
+                    end_date: '2025-02-10',
+                    tags: 'fantasy, scifi'
+                });
+
+            expect(response.status).toBe(201);
+
+            // Both books should have correct tags
+            const mediaResponse = await request(app).get('/api/media?year=2025');
+            const book1 = mediaResponse.body.find(e => e.title === 'Book 1');
+            const book2 = mediaResponse.body.find(e => e.title === 'Book 2');
+
+            expect(book1.tags.split(', ').sort()).toEqual(['adventure', 'fantasy']);
+            expect(book2.tags.split(', ').sort()).toEqual(['fantasy', 'scifi']);
+        });
+
+        it('should update tags when updating media entry', async () => {
+            // Create entry with tags
+            const createResponse = await request(app)
+                .post('/api/media')
+                .send({
+                    title: 'Updatable Book',
+                    media_type: 'book',
+                    start_date: '2025-01-01',
+                    end_date: '2025-01-10',
+                    tags: 'old, tags'
+                });
+
+            const mediaId = createResponse.body.id;
+
+            // Update with new tags
+            const updateResponse = await request(app)
+                .put(`/api/media/${mediaId}`)
+                .send({
+                    title: 'Updatable Book',
+                    media_type: 'book',
+                    start_date: '2025-01-01',
+                    end_date: '2025-01-10',
+                    tags: 'new, updated, tags'
+                });
+
+            expect(updateResponse.status).toBe(200);
+
+            // Verify tags were updated
+            const mediaResponse = await request(app).get('/api/media?year=2025');
+            const book = mediaResponse.body.find(e => e.title === 'Updatable Book');
+            expect(book.tags.split(', ').sort()).toEqual(['new', 'tags', 'updated']);
+        });
+
+        it('should handle empty tags', async () => {
+            const response = await request(app)
+                .post('/api/media')
+                .send({
+                    title: 'No Tags Book',
+                    media_type: 'book',
+                    start_date: '2025-01-01',
+                    end_date: '2025-01-10',
+                    tags: ''
+                });
+
+            expect(response.status).toBe(201);
+
+            const mediaResponse = await request(app).get('/api/media?year=2025');
+            const book = mediaResponse.body.find(e => e.title === 'No Tags Book');
+            expect(book.tags).toBe('');
+        });
+
+        it('should get all tags via API', async () => {
+            // Create entries with tags
+            await request(app)
+                .post('/api/media')
+                .send({
+                    title: 'Book 1',
+                    media_type: 'book',
+                    start_date: '2025-01-01',
+                    end_date: '2025-01-10',
+                    tags: 'fantasy, adventure'
+                });
+
+            await request(app)
+                .post('/api/media')
+                .send({
+                    title: 'Book 2',
+                    media_type: 'book',
+                    start_date: '2025-02-01',
+                    end_date: '2025-02-10',
+                    tags: 'scifi, thriller'
+                });
+
+            // Get all tags
+            const response = await request(app).get('/api/v1/tags');
+            expect(response.status).toBe(200);
+            expect(response.body.length).toBe(4);
+
+            const tagNames = response.body.map(t => t.name).sort();
+            expect(tagNames).toEqual(['adventure', 'fantasy', 'scifi', 'thriller']);
+        });
+
+        it('should normalize tag names to lowercase', async () => {
+            const response = await request(app)
+                .post('/api/media')
+                .send({
+                    title: 'Mixed Case Book',
+                    media_type: 'book',
+                    start_date: '2025-01-01',
+                    end_date: '2025-01-10',
+                    tags: 'Fantasy, SCIFI, AdVeNtUrE'
+                });
+
+            expect(response.status).toBe(201);
+
+            const mediaResponse = await request(app).get('/api/media?year=2025');
+            const book = mediaResponse.body.find(e => e.title === 'Mixed Case Book');
+            expect(book.tags.split(', ').sort()).toEqual(['adventure', 'fantasy', 'scifi']);
         });
     });
 });
