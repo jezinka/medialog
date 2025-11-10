@@ -262,6 +262,7 @@ export async function migrateToManyToManyTags(db) {
  * Run all migrations
  */
 export async function runMigrations(db) {
-  await migrateToNormalizedSchema(db);
+  // Note: Normalization migration is disabled for now as the app still uses the media table
+  // await migrateToNormalizedSchema(db);
   await migrateToManyToManyTags(db);
 }
