@@ -212,3 +212,77 @@ export const validateMediaQuery = [
     .withMessage('Year must be between 1900 and 2100'),
   handleValidationErrors,
 ];
+
+// Validation rules for bulk media creation
+export const validateBulkMediaCreation = [
+  body('items')
+    .isArray({ min: 1, max: 200 })
+    .withMessage('Items must be an array with 1-200 entries'),
+  body('items.*.title')
+    .trim()
+    .notEmpty()
+    .withMessage('Title is required')
+    .isLength({ max: 255 })
+    .withMessage('Title must be less than 255 characters')
+    .escape(),
+  body('items.*.author')
+    .optional()
+    .trim()
+    .isLength({ max: 255 })
+    .withMessage('Author must be less than 255 characters')
+    .escape(),
+  body('items.*.media_type')
+    .trim()
+    .notEmpty()
+    .withMessage('Media type is required')
+    .isIn(['book', 'comic', 'movie', 'series', 'anime', 'cartoon'])
+    .withMessage('Media type must be one of: book, comic, movie, series, anime, cartoon'),
+  body('items.*.volume_episode')
+    .optional()
+    .trim()
+    .isLength({ max: 100 })
+    .withMessage('Volume/Episode must be less than 100 characters')
+    .escape(),
+  body('items.*.tags')
+    .optional()
+    .trim()
+    .isLength({ max: 500 })
+    .withMessage('Tags must be less than 500 characters')
+    .escape(),
+  body('items.*.start_date')
+    .trim()
+    .notEmpty()
+    .withMessage('Start date is required')
+    .isISO8601()
+    .withMessage('Start date must be a valid date in YYYY-MM-DD format')
+    .custom((value) => {
+      const startDate = new Date(value);
+      
+      // Allow dates up to 10 years in the past and 1 year in the future
+      const tenYearsAgo = new Date();
+      tenYearsAgo.setFullYear(tenYearsAgo.getFullYear() - 10);
+      const oneYearFromNow = new Date();
+      oneYearFromNow.setFullYear(oneYearFromNow.getFullYear() + 1);
+      
+      if (startDate < tenYearsAgo || startDate > oneYearFromNow) {
+        throw new Error('Start date must be within the last 10 years or next year');
+      }
+      return true;
+    }),
+  body('items.*.end_date')
+    .optional({ values: 'null' })
+    .trim()
+    .isISO8601()
+    .withMessage('End date must be a valid date in YYYY-MM-DD format'),
+  body('items.*.notes')
+    .optional()
+    .trim()
+    .isLength({ max: 1000 })
+    .withMessage('Notes must be less than 1000 characters')
+    .escape(),
+  body('items.*.discontinued')
+    .optional()
+    .isBoolean()
+    .withMessage('Discontinued must be a boolean'),
+  handleValidationErrors,
+];
