@@ -1,9 +1,8 @@
 import request from 'supertest';
 import fs from 'fs';
-import path from 'path';
 import sqlite3 from 'sqlite3';
 import { open } from 'sqlite';
-import { app, initDb, setDb } from '../server.js';
+import { app, setDb } from '../server.js';
 
 const TEST_DB = 'test_medialog.db';
 let db;
@@ -33,6 +32,7 @@ beforeAll(async () => {
             volume_episode TEXT,
             tags TEXT,
             notes TEXT,
+            discontinued INTEGER DEFAULT 0,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
@@ -339,6 +339,92 @@ describe('Media Log API', () => {
 
             expect(book2024).toBeDefined();
             expect(book2025).toBeDefined();
+        });
+    });
+
+    describe('Discontinued Feature', () => {
+        it('should add a discontinued media entry', async () => {
+            const response = await request(app)
+                .post('/api/media')
+                .send({
+                    title: 'Abandoned Book',
+                    media_type: 'book',
+                    start_date: '2025-01-01',
+                    end_date: '2025-01-05',
+                    discontinued: true
+                });
+
+            expect(response.status).toBe(201);
+            expect(response.body.id).toBeDefined();
+        });
+
+        it('should retrieve discontinued status correctly', async () => {
+            await request(app)
+                .post('/api/media')
+                .send({
+                    title: 'Discontinued Series',
+                    media_type: 'series',
+                    start_date: '2025-02-01',
+                    end_date: '2025-02-03',
+                    discontinued: true
+                });
+
+            const response = await request(app).get('/api/media?year=2025');
+            expect(response.status).toBe(200);
+            
+            const discontinuedItem = response.body.find(e => e.title === 'Discontinued Series');
+            expect(discontinuedItem).toBeDefined();
+            expect(discontinuedItem.discontinued).toBe(1);
+        });
+
+        it('should update discontinued status via PUT', async () => {
+            // Add a normal entry
+            const addResponse = await request(app)
+                .post('/api/media')
+                .send({
+                    title: 'Book to Discontinue',
+                    media_type: 'book',
+                    start_date: '2025-03-01',
+                    end_date: '2025-03-10',
+                    discontinued: false
+                });
+
+            const mediaId = addResponse.body.id;
+
+            // Update to discontinued
+            const updateResponse = await request(app)
+                .put(`/api/media/${mediaId}`)
+                .send({
+                    title: 'Book to Discontinue',
+                    media_type: 'book',
+                    start_date: '2025-03-01',
+                    end_date: '2025-03-10',
+                    discontinued: true
+                });
+
+            expect(updateResponse.status).toBe(200);
+
+            // Verify the update
+            const getResponse = await request(app).get('/api/media?year=2025');
+            const updatedItem = getResponse.body.find(e => e.id === mediaId);
+            expect(updatedItem.discontinued).toBe(1);
+        });
+
+        it('should handle discontinued field as false by default', async () => {
+            const response = await request(app)
+                .post('/api/media')
+                .send({
+                    title: 'Regular Book',
+                    media_type: 'book',
+                    start_date: '2025-04-01',
+                    end_date: '2025-04-10'
+                });
+
+            expect(response.status).toBe(201);
+
+            const getResponse = await request(app).get('/api/media?year=2025');
+            const item = getResponse.body.find(e => e.title === 'Regular Book');
+            expect(item.discontinued).toBe(0);
         });
     });
 });

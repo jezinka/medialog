@@ -48,7 +48,7 @@ export const validateMediaCreation = [
     .withMessage('Start date is required')
     .isISO8601()
     .withMessage('Start date must be a valid date in YYYY-MM-DD format')
-    .custom((value, { req }) => {
+    .custom((value) => {
       const startDate = new Date(value);
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -147,7 +147,7 @@ export const validateMediaUpdate = [
     .withMessage('Start date is required')
     .isISO8601()
     .withMessage('Start date must be a valid date in YYYY-MM-DD format')
-    .custom((value, { req }) => {
+    .custom((value) => {
       const startDate = new Date(value);
       const today = new Date();
       today.setHours(0, 0, 0, 0);
