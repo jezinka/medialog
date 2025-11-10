@@ -492,3 +492,106 @@ header h1 {
 .toast-close:hover {
     color: #333;
 }
+
+/* Edit and Action Buttons */
+.media-item-buttons {
+    display: flex;
+    gap: 8px;
+}
+
+.action-btn {
+    background: #667eea;
+    color: white;
+    border: none;
+    padding: 5px 12px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: background 0.3s;
+}
+
+.action-btn:hover {
+    background: #5568d3;
+}
+
+.save-btn {
+    background: #4caf50;
+    color: white;
+    border: none;
+    padding: 8px 20px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background 0.3s;
+}
+
+.save-btn:hover {
+    background: #45a049;
+}
+
+.cancel-btn {
+    background: #999;
+    color: white;
+    border: none;
+    padding: 8px 20px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background 0.3s;
+}
+
+.cancel-btn:hover {
+    background: #777;
+}
+
+/* Edit Form in Media Item */
+.media-item-edit {
+    padding: 10px 0;
+}
+
+.edit-form .form-group {
+    margin-bottom: 12px;
+}
+
+.edit-form .form-group label {
+    display: block;
+    margin-bottom: 4px;
+    color: #333;
+    font-weight: 500;
+    font-size: 13px;
+}
+
+.edit-form input[type="text"],
+.edit-form input[type="date"],
+.edit-form select,
+.edit-form textarea {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    font-size: 14px;
+}
+
+.edit-form textarea {
+    resize: vertical;
+    font-family: inherit;
+}
+
+.edit-buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 15px;
+}
+
+/* Responsive improvements */
+@media (max-width: 600px) {
+    .media-item-buttons {
+        flex-wrap: wrap;
+    }
+    
+    .action-btn,
+    .delete-btn {
+        font-size: 11px;
+        padding: 4px 8px;
+    }
+}

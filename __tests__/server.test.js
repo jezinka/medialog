@@ -29,7 +29,9 @@ beforeAll(async () => {
             media_type TEXT NOT NULL,
             start_date TEXT NOT NULL,
             end_date TEXT NOT NULL,
-            notes TEXT
+            notes TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     `);
     
@@ -205,6 +207,85 @@ describe('Media Log API', () => {
             const response = await request(app).delete('/api/media/invalid');
             expect(response.status).toBe(400);
             expect(response.body.error).toBe('Invalid media ID');
+        });
+    });
+
+    describe('PUT /api/media/:id', () => {
+        it('should update an existing media entry', async () => {
+            // First create an entry
+            const addResponse = await request(app)
+                .post('/api/media')
+                .send({
+                    title: 'Original Title',
+                    media_type: 'book',
+                    start_date: '2025-07-01',
+                    end_date: '2025-07-10',
+                    notes: 'Original notes'
+                });
+
+            const mediaId = addResponse.body.id;
+
+            // Now update it
+            const updateResponse = await request(app)
+                .put(`/api/media/${mediaId}`)
+                .send({
+                    title: 'Updated Title',
+                    media_type: 'series',
+                    start_date: '2025-07-05',
+                    end_date: '2025-07-15',
+                    notes: 'Updated notes'
+                });
+
+            expect(updateResponse.status).toBe(200);
+            expect(updateResponse.body.message).toBe('Media entry updated successfully');
+
+            // Verify the update
+            const getResponse = await request(app).get('/api/media');
+            const updatedEntry = getResponse.body.find(entry => entry.id === mediaId);
+            expect(updatedEntry.title).toBe('Updated Title');
+            expect(updatedEntry.media_type).toBe('series');
+            expect(updatedEntry.start_date).toBe('2025-07-05');
+            expect(updatedEntry.end_date).toBe('2025-07-15');
+            expect(updatedEntry.notes).toBe('Updated notes');
+        });
+
+        it('should return 404 for non-existent media entry', async () => {
+            const response = await request(app)
+                .put('/api/media/99999')
+                .send({
+                    title: 'Updated Title',
+                    media_type: 'book',
+                    start_date: '2025-07-01',
+                    end_date: '2025-07-10'
+                });
+            expect(response.status).toBe(404);
+            expect(response.body.error).toBe('Media entry not found');
+        });
+
+        it('should return 400 for invalid data', async () => {
+            // First create an entry
+            const addResponse = await request(app)
+                .post('/api/media')
+                .send({
+                    title: 'Test Entry',
+                    media_type: 'book',
+                    start_date: '2025-08-01',
+                    end_date: '2025-08-10'
+                });
+
+            const mediaId = addResponse.body.id;
+
+            // Try to update with invalid data (missing required field)
+            const response = await request(app)
+                .put(`/api/media/${mediaId}`)
+                .send({
+                    title: 'Updated Title',
+                    media_type: 'book',
+                    start_date: '2025-08-01'
+                    // missing end_date
+                });
+
+            expect(response.status).toBe(400);
         });
     });
 

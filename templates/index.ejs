@@ -426,18 +426,56 @@
         function createMediaItem(item) {
             const div = document.createElement('div');
             div.className = 'media-item';
+            div.id = `media-item-${item.id}`;
             
             const content = `
-                <div class="media-item-header">
-                    <strong>${item.title}</strong>
-                    <button onclick="deleteMedia(${item.id})" class="delete-btn">Usuń</button>
+                <div class="media-item-view" id="view-${item.id}">
+                    <div class="media-item-header">
+                        <strong>${item.title}</strong>
+                        <div class="media-item-buttons">
+                            <button onclick="addAgain(${item.id})" class="action-btn" title="Dodaj ponownie (re-watch/re-read)">Dodaj ponownie</button>
+                            <button onclick="editMedia(${item.id})" class="action-btn">Edytuj</button>
+                            <button onclick="deleteMedia(${item.id})" class="delete-btn">Usuń</button>
+                        </div>
+                    </div>
+                    <div class="media-item-details">
+                        <span>Od: ${formatDate(item.start_date)}</span>
+                        <span>Do: ${formatDate(item.end_date)}</span>
+                        <span>${calculateDays(item.start_date, item.end_date)} dni</span>
+                    </div>
+                    ${item.notes ? `<div class="media-item-notes">${item.notes}</div>` : ''}
                 </div>
-                <div class="media-item-details">
-                    <span>Od: ${formatDate(item.start_date)}</span>
-                    <span>Do: ${formatDate(item.end_date)}</span>
-                    <span>${calculateDays(item.start_date, item.end_date)} dni</span>
+                <div class="media-item-edit" id="edit-${item.id}" style="display: none;">
+                    <div class="edit-form">
+                        <div class="form-group">
+                            <label>Tytuł:</label>
+                            <input type="text" id="edit-title-${item.id}" value="${item.title}" />
+                        </div>
+                        <div class="form-group">
+                            <label>Typ:</label>
+                            <select id="edit-type-${item.id}">
+                                <option value="book" ${item.media_type === 'book' ? 'selected' : ''}>Książka</option>
+                                <option value="series" ${item.media_type === 'series' ? 'selected' : ''}>Serial/Film</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Data rozpoczęcia:</label>
+                            <input type="date" id="edit-start-${item.id}" value="${item.start_date}" />
+                        </div>
+                        <div class="form-group">
+                            <label>Data zakończenia:</label>
+                            <input type="date" id="edit-end-${item.id}" value="${item.end_date}" />
+                        </div>
+                        <div class="form-group">
+                            <label>Notatki:</label>
+                            <textarea id="edit-notes-${item.id}" rows="2">${item.notes || ''}</textarea>
+                        </div>
+                        <div class="edit-buttons">
+                            <button onclick="updateMedia(${item.id})" class="save-btn">Zapisz</button>
+                            <button onclick="cancelEdit(${item.id})" class="cancel-btn">Anuluj</button>
+                        </div>
+                    </div>
                 </div>
-                ${item.notes ? `<div class="media-item-notes">${item.notes}</div>` : ''}
             `;
             
             div.innerHTML = content;
@@ -511,6 +549,80 @@
                 console.error('Error deleting media:', error);
                 showToast('Wystąpił błąd podczas usuwania pozycji.', 'error');
             }
+        }
+
+        function editMedia(id) {
+            // Hide view mode and show edit mode
+            document.getElementById(`view-${id}`).style.display = 'none';
+            document.getElementById(`edit-${id}`).style.display = 'block';
+        }
+
+        function cancelEdit(id) {
+            // Hide edit mode and show view mode
+            document.getElementById(`edit-${id}`).style.display = 'none';
+            document.getElementById(`view-${id}`).style.display = 'block';
+        }
+
+        async function updateMedia(id) {
+            const formData = {
+                title: document.getElementById(`edit-title-${id}`).value,
+                media_type: document.getElementById(`edit-type-${id}`).value,
+                start_date: document.getElementById(`edit-start-${id}`).value,
+                end_date: document.getElementById(`edit-end-${id}`).value,
+                notes: document.getElementById(`edit-notes-${id}`).value
+            };
+            
+            try {
+                const response = await fetch(`/api/media/${id}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(formData)
+                });
+                
+                if (response.ok) {
+                    showToast('Pozycja została zaktualizowana!', 'success');
+                    loadMedia();
+                } else {
+                    const error = await response.json();
+                    showToast('Błąd: ' + (error.error || 'Nie udało się zaktualizować'), 'error');
+                }
+            } catch (error) {
+                console.error('Error updating media:', error);
+                showToast('Wystąpił błąd podczas aktualizacji pozycji.', 'error');
+            }
+        }
+
+        function addAgain(id) {
+            // Find the media item in allMedia array
+            const item = allMedia.find(m => m.id === id);
+            if (!item) return;
+            
+            // Expand the form if collapsed
+            const formContainer = document.getElementById('formContainer');
+            const toggleIcon = document.getElementById('toggleIcon');
+            if (formContainer.style.maxHeight === '0px' || !formContainer.style.maxHeight) {
+                formContainer.style.maxHeight = '1000px';
+                toggleIcon.textContent = '▲';
+            }
+            
+            // Pre-fill form with title and type, but clear dates and notes
+            document.getElementById('title').value = item.title;
+            document.getElementById('mediaType').value = item.media_type;
+            document.getElementById('startDate').value = '';
+            document.getElementById('endDate').value = '';
+            document.getElementById('notes').value = '';
+            
+            // Scroll to form
+            document.querySelector('.add-media-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
+            
+            // Focus on start date input
+            setTimeout(() => {
+                document.getElementById('startDate').focus();
+            }, 500);
+            
+            showToast('Formularz wypełniony - wybierz nowe daty', 'success');
         }
     </script>
 </body>

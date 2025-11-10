@@ -9,6 +9,7 @@ import logger from './src/utils/logger.js';
 import { apiLimiter, writeApiLimiter } from './src/middleware/rateLimiter.js';
 import {
   validateMediaCreation,
+  validateMediaUpdate,
   validateMediaDeletion,
   validateMediaQuery,
 } from './src/middleware/validator.js';
@@ -141,6 +142,34 @@ app.post(
   }
 );
 
+app.put(
+  `${API_PREFIX}/media/:id`,
+  writeApiLimiter,
+  validateMediaUpdate,
+  async (req, res) => {
+    try {
+      const mediaId = parseInt(req.params.id);
+      const { title, media_type, start_date, end_date, notes = '' } = req.body;
+
+      const result = await db.run(
+        'UPDATE media SET title = ?, media_type = ?, start_date = ?, end_date = ?, notes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+        [title, media_type, start_date, end_date, notes, mediaId]
+      );
+
+      if (result.changes === 0) {
+        logger.warn(`Media entry not found for update: ID ${mediaId}`);
+        return res.status(404).json({ error: 'Media entry not found' });
+      }
+
+      logger.info(`Updated media entry: ${title} (ID: ${mediaId})`);
+      res.json({ message: 'Media entry updated successfully' });
+    } catch (error) {
+      logger.error('Error updating media:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+);
+
 app.delete(
   `${API_PREFIX}/media/:id`,
   writeApiLimiter,
@@ -228,6 +257,51 @@ app.post('/api/media', async (req, res) => {
     });
   } catch (error) {
     logger.error('Error adding media:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.put('/api/media/:id', async (req, res) => {
+  try {
+    const mediaId = parseInt(req.params.id);
+
+    if (isNaN(mediaId)) {
+      return res.status(400).json({ error: 'Invalid media ID' });
+    }
+
+    const { title, media_type, start_date, end_date, notes = '' } = req.body;
+
+    // Basic validation
+    if (!title || !media_type || !start_date || !end_date) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    if (!['book', 'series'].includes(media_type)) {
+      return res.status(400).json({
+        error: 'Invalid media type. Must be "book" or "series"',
+      });
+    }
+
+    // Validate date format
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRegex.test(start_date) || !dateRegex.test(end_date)) {
+      return res.status(400).json({
+        error: 'Invalid date format. Use YYYY-MM-DD',
+      });
+    }
+
+    const result = await db.run(
+      'UPDATE media SET title = ?, media_type = ?, start_date = ?, end_date = ?, notes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      [title, media_type, start_date, end_date, notes, mediaId]
+    );
+
+    if (result.changes === 0) {
+      return res.status(404).json({ error: 'Media entry not found' });
+    }
+
+    res.json({ message: 'Media entry updated successfully' });
+  } catch (error) {
+    logger.error('Error updating media:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
