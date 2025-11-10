@@ -65,12 +65,16 @@ export const validateMediaCreation = [
       return true;
     }),
   body('end_date')
+    .optional({ values: 'null' })
     .trim()
-    .notEmpty()
-    .withMessage('End date is required')
     .isISO8601()
     .withMessage('End date must be a valid date in YYYY-MM-DD format')
     .custom((value, { req }) => {
+      // If end_date is not provided, skip validation
+      if (!value) {
+        return true;
+      }
+      
       const startDate = new Date(req.body.start_date);
       const endDate = new Date(value);
       
@@ -164,12 +168,16 @@ export const validateMediaUpdate = [
       return true;
     }),
   body('end_date')
+    .optional({ values: 'null' })
     .trim()
-    .notEmpty()
-    .withMessage('End date is required')
     .isISO8601()
     .withMessage('End date must be a valid date in YYYY-MM-DD format')
     .custom((value, { req }) => {
+      // If end_date is not provided, skip validation
+      if (!value) {
+        return true;
+      }
+      
       const startDate = new Date(req.body.start_date);
       const endDate = new Date(value);
       

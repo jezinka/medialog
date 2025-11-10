@@ -57,8 +57,8 @@
                             <input type="date" id="startDate" name="startDate" required>
                         </div>
                         <div class="form-group">
-                            <label for="endDate">Data zakończenia:</label>
-                            <input type="date" id="endDate" name="endDate" required>
+                            <label for="endDate">Data zakończenia (opcjonalna):</label>
+                            <input type="date" id="endDate" name="endDate">
                         </div>
                     </div>
                     <div class="form-group">
@@ -239,9 +239,14 @@
                 if (month) {
                     filteredMedia = media.filter(item => {
                         const startDate = new Date(item.start_date);
-                        const endDate = new Date(item.end_date);
                         const monthInt = parseInt(month);
                         
+                        // If no end_date, check if start is in the month
+                        if (!item.end_date) {
+                            return startDate.getMonth() + 1 == monthInt && startDate.getFullYear() == year;
+                        }
+                        
+                        const endDate = new Date(item.end_date);
                         // Check if the media was consumed during the selected month
                         return (startDate.getMonth() + 1 <= monthInt && endDate.getMonth() + 1 >= monthInt &&
                                 startDate.getFullYear() == year && endDate.getFullYear() == year) ||
@@ -267,6 +272,7 @@
             const series = media.filter(m => m.media_type === 'series');
             
             const totalDaysBooks = books.reduce((sum, item) => {
+                if (!item.end_date) return sum; // Skip items without end_date
                 const start = new Date(item.start_date);
                 const end = new Date(item.end_date);
                 const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
@@ -274,6 +280,7 @@
             }, 0);
             
             const totalDaysSeries = series.reduce((sum, item) => {
+                if (!item.end_date) return sum; // Skip items without end_date
                 const start = new Date(item.start_date);
                 const end = new Date(item.end_date);
                 const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
@@ -309,12 +316,18 @@
                 html += '<h4 style="margin-bottom: 10px;">📚 Książki:</h4>';
                 books.forEach(book => {
                     const start = new Date(book.start_date);
-                    const end = new Date(book.end_date);
-                    const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+                    let daysText;
+                    if (!book.end_date) {
+                        daysText = 'W trakcie';
+                    } else {
+                        const end = new Date(book.end_date);
+                        const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+                        daysText = `${days} dni`;
+                    }
                     html += `
                         <div class="summary-list-item">
                             <span class="summary-list-title">${book.title}</span>
-                            <span class="summary-list-days">${days} dni</span>
+                            <span class="summary-list-days">${daysText}</span>
                         </div>
                     `;
                 });
@@ -326,12 +339,18 @@
                 html += '<h4 style="margin-bottom: 10px;">🎬 Seriale i Filmy:</h4>';
                 series.forEach(item => {
                     const start = new Date(item.start_date);
-                    const end = new Date(item.end_date);
-                    const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+                    let daysText;
+                    if (!item.end_date) {
+                        daysText = 'W trakcie';
+                    } else {
+                        const end = new Date(item.end_date);
+                        const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+                        daysText = `${days} dni`;
+                    }
                     html += `
                         <div class="summary-list-item">
                             <span class="summary-list-title">${item.title}</span>
-                            <span class="summary-list-days">${days} dni</span>
+                            <span class="summary-list-days">${daysText}</span>
                         </div>
                     `;
                 });
@@ -399,11 +418,17 @@
                     // Check if this day is covered by any media item
                     const mediaOnDay = mediaItems.filter(item => {
                         const start = new Date(item.start_date);
+                        start.setHours(0, 0, 0, 0);
+                        currentDate.setHours(0, 0, 0, 0);
+                        
+                        // If no end_date, only show on start date
+                        if (!item.end_date) {
+                            return currentDate.getTime() === start.getTime();
+                        }
+                        
                         const end = new Date(item.end_date);
                         // FIX: Make date range inclusive by comparing dates only (not time)
-                        start.setHours(0, 0, 0, 0);
                         end.setHours(0, 0, 0, 0);
-                        currentDate.setHours(0, 0, 0, 0);
                         return currentDate >= start && currentDate <= end;
                     });
                     
@@ -509,7 +534,7 @@
                         <span>${typeLabel}</span>
                         <span>Od: ${formatDate(item.start_date)}</span>
                         <span>Do: ${formatDate(item.end_date)}</span>
-                        <span>${calculateDays(item.start_date, item.end_date)} dni</span>
+                        <span>${item.end_date ? calculateDays(item.start_date, item.end_date) + ' dni' : 'W trakcie'}</span>
                     </div>
                     ${item.tags ? `<div class="media-item-tags">🏷️ ${item.tags}</div>` : ''}
                     ${item.notes ? `<div class="media-item-notes">${item.notes}</div>` : ''}
@@ -544,8 +569,8 @@
                             <input type="date" id="edit-start-${item.id}" value="${item.start_date}" />
                         </div>
                         <div class="form-group">
-                            <label>Data zakończenia:</label>
-                            <input type="date" id="edit-end-${item.id}" value="${item.end_date}" />
+                            <label>Data zakończenia (opcjonalna):</label>
+                            <input type="date" id="edit-end-${item.id}" value="${item.end_date || ''}" />
                         </div>
                         <div class="form-group">
                             <label>Tagi:</label>
@@ -574,6 +599,7 @@
         }
 
         function formatDate(dateStr) {
+            if (!dateStr) return 'W trakcie';
             const date = new Date(dateStr);
             return date.toLocaleDateString('pl-PL');
         }

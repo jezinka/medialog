@@ -28,7 +28,7 @@ beforeAll(async () => {
             author TEXT,
             media_type TEXT NOT NULL,
             start_date TEXT NOT NULL,
-            end_date TEXT NOT NULL,
+            end_date TEXT,
             volume_episode TEXT,
             tags TEXT,
             notes TEXT,
@@ -278,14 +278,13 @@ describe('Media Log API', () => {
 
             const mediaId = addResponse.body.id;
 
-            // Try to update with invalid data (missing required field)
+            // Try to update with invalid data (missing required field - title)
             const response = await request(app)
                 .put(`/api/media/${mediaId}`)
                 .send({
-                    title: 'Updated Title',
                     media_type: 'book',
                     start_date: '2025-08-01'
-                    // missing end_date
+                    // missing title (required field)
                 });
 
             expect(response.status).toBe(400);
@@ -371,7 +370,7 @@ describe('Media Log API', () => {
 
             const response = await request(app).get('/api/media?year=2025');
             expect(response.status).toBe(200);
-            
+
             const discontinuedItem = response.body.find(e => e.title === 'Discontinued Series');
             expect(discontinuedItem).toBeDefined();
             expect(discontinuedItem.discontinued).toBe(1);
@@ -425,6 +424,64 @@ describe('Media Log API', () => {
             const getResponse = await request(app).get('/api/media?year=2025');
             const item = getResponse.body.find(e => e.title === 'Regular Book');
             expect(item.discontinued).toBe(0);
+        });
+    });
+
+    describe('Optional End Date', () => {
+        it('should allow creating media entry without end_date', async () => {
+            const response = await request(app)
+                .post('/api/media')
+                .send({
+                    title: 'Currently Reading Book',
+                    media_type: 'book',
+                    start_date: '2025-09-01'
+                    // no end_date
+                });
+
+            expect(response.status).toBe(201);
+            expect(response.body).toHaveProperty('id');
+        });
+
+        it('should allow updating media entry to remove end_date', async () => {
+            // First create an entry with end_date
+            const addResponse = await request(app)
+                .post('/api/media')
+                .send({
+                    title: 'Test Book',
+                    media_type: 'book',
+                    start_date: '2025-09-01',
+                    end_date: '2025-09-10'
+                });
+
+            const mediaId = addResponse.body.id;
+
+            // Update to remove end_date
+            const updateResponse = await request(app)
+                .put(`/api/media/${mediaId}`)
+                .send({
+                    title: 'Test Book',
+                    media_type: 'book',
+                    start_date: '2025-09-01'
+                    // no end_date
+                });
+
+            expect(updateResponse.status).toBe(200);
+        });
+
+        it('should retrieve media entries without end_date', async () => {
+            await request(app)
+                .post('/api/media')
+                .send({
+                    title: 'In Progress Series',
+                    media_type: 'series',
+                    start_date: '2025-09-15'
+                });
+
+            const response = await request(app).get('/api/media?year=2025');
+            const inProgressEntry = response.body.find(e => e.title === 'In Progress Series');
+
+            expect(inProgressEntry).toBeDefined();
+            expect(inProgressEntry.end_date).toBeNull();
         });
     });
 });
