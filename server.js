@@ -68,6 +68,25 @@ async function initDb() {
         )
       `);
 
+      // Migration: Add missing columns if they don't exist
+      const tableInfo = await db.all("PRAGMA table_info(media)");
+      const columnNames = tableInfo.map(col => col.name);
+      
+      if (!columnNames.includes('author')) {
+        await db.exec('ALTER TABLE media ADD COLUMN author TEXT');
+        logger.info('Added author column to media table');
+      }
+      
+      if (!columnNames.includes('volume_episode')) {
+        await db.exec('ALTER TABLE media ADD COLUMN volume_episode TEXT');
+        logger.info('Added volume_episode column to media table');
+      }
+      
+      if (!columnNames.includes('tags')) {
+        await db.exec('ALTER TABLE media ADD COLUMN tags TEXT');
+        logger.info('Added tags column to media table');
+      }
+
       logger.info('Database initialized successfully');
     } catch (error) {
       logger.error('Failed to initialize database:', error);
