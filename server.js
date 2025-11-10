@@ -29,6 +29,7 @@ app.use(
         defaultSrc: ["'self'"],
         styleSrc: ["'self'", "'unsafe-inline'"],
         scriptSrc: ["'self'", "'unsafe-inline'"],
+        scriptSrcAttr: ["'none'"], // Block inline event handlers (onclick, etc.)
       },
     },
   })

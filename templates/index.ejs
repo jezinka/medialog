@@ -11,14 +11,14 @@
         <header>
             <h1>Media Log - <%= year %></h1>
             <div class="year-navigation">
-                <button onclick="changeYear(-1)">← <%= year - 1 %></button>
-                <button onclick="changeYear(0)">Bieżący rok</button>
-                <button onclick="changeYear(1)"><%= year + 1 %> →</button>
+                <button data-action="changeYear" data-delta="-1">← <%= year - 1 %></button>
+                <button data-action="changeYear" data-delta="0">Bieżący rok</button>
+                <button data-action="changeYear" data-delta="1"><%= year + 1 %> →</button>
             </div>
         </header>
 
         <div class="add-media-section">
-            <h2 onclick="toggleForm()">
+            <h2 data-action="toggleForm">
                 Dodaj nową pozycję 
                 <span class="toggle-icon" id="toggleIcon">▼</span>
             </h2>
@@ -57,7 +57,7 @@
         </div>
 
         <div class="summary-section">
-            <h2 onclick="toggleSummary()" style="cursor: pointer;">
+            <h2 data-action="toggleSummary" style="cursor: pointer;">
                 📊 Podsumowanie 
                 <span class="toggle-icon" id="summaryToggleIcon">▼</span>
             </h2>
@@ -69,7 +69,7 @@
                     <select id="summaryMonth">
                         <!-- Options populated dynamically by JavaScript -->
                     </select>
-                    <button class="summary-btn" onclick="generateSummary()">Generuj podsumowanie</button>
+                    <button class="summary-btn" data-action="generateSummary">Generuj podsumowanie</button>
                 </div>
                 <div id="summaryContent"></div>
             </div>
@@ -113,7 +113,7 @@
             toast.innerHTML = `
                 <span class="toast-icon">${icon}</span>
                 <span class="toast-message">${message}</span>
-                <button class="toast-close" onclick="this.parentElement.remove()">×</button>
+                <button class="toast-close" data-action="closeToast">×</button>
             `;
             
             document.body.appendChild(toast);
@@ -433,9 +433,9 @@
                     <div class="media-item-header">
                         <strong>${item.title}</strong>
                         <div class="media-item-buttons">
-                            <button onclick="addAgain(${item.id})" class="action-btn" title="Dodaj ponownie (re-watch/re-read)">Dodaj ponownie</button>
-                            <button onclick="editMedia(${item.id})" class="action-btn">Edytuj</button>
-                            <button onclick="deleteMedia(${item.id})" class="delete-btn">Usuń</button>
+                            <button data-action="addAgain" data-id="${item.id}" class="action-btn" title="Dodaj ponownie (re-watch/re-read)">Dodaj ponownie</button>
+                            <button data-action="editMedia" data-id="${item.id}" class="action-btn">Edytuj</button>
+                            <button data-action="deleteMedia" data-id="${item.id}" class="delete-btn">Usuń</button>
                         </div>
                     </div>
                     <div class="media-item-details">
@@ -471,8 +471,8 @@
                             <textarea id="edit-notes-${item.id}" rows="2">${item.notes || ''}</textarea>
                         </div>
                         <div class="edit-buttons">
-                            <button onclick="updateMedia(${item.id})" class="save-btn">Zapisz</button>
-                            <button onclick="cancelEdit(${item.id})" class="cancel-btn">Anuluj</button>
+                            <button data-action="updateMedia" data-id="${item.id}" class="save-btn">Zapisz</button>
+                            <button data-action="cancelEdit" data-id="${item.id}" class="cancel-btn">Anuluj</button>
                         </div>
                     </div>
                 </div>
@@ -624,6 +624,59 @@
             
             showToast('Formularz wypełniony - wybierz nowe daty', 'success');
         }
+
+        // Event delegation for all click events
+        document.addEventListener('click', function(event) {
+            const target = event.target;
+            const action = target.getAttribute('data-action');
+            
+            if (!action) return;
+            
+            // Don't prevent default for links and form submissions
+            if (target.tagName === 'BUTTON') {
+                event.preventDefault();
+            }
+            event.stopPropagation();
+            
+            switch(action) {
+                case 'changeYear':
+                    const delta = parseInt(target.getAttribute('data-delta'));
+                    changeYear(delta);
+                    break;
+                case 'toggleForm':
+                    toggleForm();
+                    break;
+                case 'toggleSummary':
+                    toggleSummary();
+                    break;
+                case 'generateSummary':
+                    generateSummary();
+                    break;
+                case 'closeToast':
+                    target.parentElement.remove();
+                    break;
+                case 'addAgain':
+                    const addAgainId = parseInt(target.getAttribute('data-id'));
+                    addAgain(addAgainId);
+                    break;
+                case 'editMedia':
+                    const editId = parseInt(target.getAttribute('data-id'));
+                    editMedia(editId);
+                    break;
+                case 'deleteMedia':
+                    const deleteId = parseInt(target.getAttribute('data-id'));
+                    deleteMedia(deleteId);
+                    break;
+                case 'updateMedia':
+                    const updateId = parseInt(target.getAttribute('data-id'));
+                    updateMedia(updateId);
+                    break;
+                case 'cancelEdit':
+                    const cancelId = parseInt(target.getAttribute('data-id'));
+                    cancelEdit(cancelId);
+                    break;
+            }
+        });
     </script>
 </body>
 </html>
