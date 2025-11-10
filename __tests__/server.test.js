@@ -1,9 +1,9 @@
-const request = require('supertest');
-const fs = require('fs');
-const path = require('path');
-const sqlite3 = require('sqlite3').verbose();
-const { open } = require('sqlite');
-const { app, initDb, setDb } = require('../server');
+import request from 'supertest';
+import fs from 'fs';
+import path from 'path';
+import sqlite3 from 'sqlite3';
+import { open } from 'sqlite';
+import { app, initDb, setDb } from '../server.js';
 
 const TEST_DB = 'test_medialog.db';
 let db;
