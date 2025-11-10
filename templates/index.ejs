@@ -30,11 +30,25 @@
                             <input type="text" id="title" name="title" required>
                         </div>
                         <div class="form-group">
+                            <label for="author">Autor:</label>
+                            <input type="text" id="author" name="author" placeholder="Opcjonalnie">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
                             <label for="mediaType">Typ:</label>
                             <select id="mediaType" name="mediaType" required>
-                                <option value="book">Książka</option>
-                                <option value="series">Serial/Film</option>
+                                <option value="book">📖 Książka</option>
+                                <option value="comic">📰 Komiks</option>
+                                <option value="movie">🎬 Film</option>
+                                <option value="series">📺 Serial</option>
+                                <option value="anime">🎌 Anime</option>
+                                <option value="cartoon">🎨 Bajka</option>
                             </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="volumeEpisode">Tom/Odcinek:</label>
+                            <input type="text" id="volumeEpisode" name="volumeEpisode" placeholder="Opcjonalnie">
                         </div>
                     </div>
                     <div class="form-row">
@@ -46,6 +60,10 @@
                             <label for="endDate">Data zakończenia:</label>
                             <input type="date" id="endDate" name="endDate" required>
                         </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="tags">Tagi (oddzielone przecinkami):</label>
+                        <input type="text" id="tags" name="tags" placeholder="np. kino, akcja, polski">
                     </div>
                     <div class="form-group">
                         <label for="notes">Notatki (opcjonalne):</label>
@@ -318,11 +336,13 @@
         }
 
         function renderCalendars(media) {
-            const books = media.filter(m => m.media_type === 'book');
-            const series = media.filter(m => m.media_type === 'series');
+            // Books calendar: books and comics
+            const books = media.filter(m => m.media_type === 'book' || m.media_type === 'comic');
+            // Visual media calendar: movies, series, anime, cartoons
+            const visual = media.filter(m => ['movie', 'series', 'anime', 'cartoon'].includes(m.media_type));
             
             renderCalendar('booksCalendar', books, currentYear);
-            renderCalendar('seriesCalendar', series, currentYear);
+            renderCalendar('seriesCalendar', visual, currentYear);
         }
 
         function renderCalendar(elementId, mediaItems, year) {
@@ -374,12 +394,35 @@
                     const mediaOnDay = mediaItems.filter(item => {
                         const start = new Date(item.start_date);
                         const end = new Date(item.end_date);
+                        // FIX: Make date range inclusive by comparing dates only (not time)
+                        start.setHours(0, 0, 0, 0);
+                        end.setHours(0, 0, 0, 0);
+                        currentDate.setHours(0, 0, 0, 0);
                         return currentDate >= start && currentDate <= end;
                     });
                     
                     if (mediaOnDay.length > 0) {
                         dayDiv.classList.add('has-media');
-                        dayDiv.title = mediaOnDay.map(m => m.title).join(', ');
+                        
+                        // Get unique media types for this day
+                        const types = [...new Set(mediaOnDay.map(m => m.media_type))];
+                        
+                        // Add type-specific classes for coloring
+                        if (types.length === 1) {
+                            dayDiv.classList.add(`media-${types[0]}`);
+                        } else {
+                            // Multiple types on same day - add a mixed class
+                            dayDiv.classList.add('media-mixed');
+                        }
+                        
+                        // Build tooltip with author info
+                        const titlesList = mediaOnDay.map(m => {
+                            let text = m.title;
+                            if (m.author) text += ` - ${m.author}`;
+                            if (m.volume_episode) text += ` (${m.volume_episode})`;
+                            return text;
+                        });
+                        dayDiv.title = titlesList.join(', ');
                     }
                     
                     daysGrid.appendChild(dayDiv);
@@ -399,8 +442,9 @@
                 return;
             }
             
-            const books = media.filter(m => m.media_type === 'book');
-            const series = media.filter(m => m.media_type === 'series');
+            // Group media by type
+            const books = media.filter(m => m.media_type === 'book' || m.media_type === 'comic');
+            const visual = media.filter(m => ['movie', 'series', 'anime', 'cartoon'].includes(m.media_type));
             
             if (books.length > 0) {
                 const booksSection = document.createElement('div');
@@ -412,14 +456,14 @@
                 container.appendChild(booksSection);
             }
             
-            if (series.length > 0) {
-                const seriesSection = document.createElement('div');
-                seriesSection.className = 'media-category';
-                seriesSection.innerHTML = '<h3>🎬 Seriale i Filmy</h3>';
-                series.forEach(item => {
-                    seriesSection.appendChild(createMediaItem(item));
+            if (visual.length > 0) {
+                const visualSection = document.createElement('div');
+                visualSection.className = 'media-category';
+                visualSection.innerHTML = '<h3>🎬 Seriale i Filmy</h3>';
+                visual.forEach(item => {
+                    visualSection.appendChild(createMediaItem(item));
                 });
-                container.appendChild(seriesSection);
+                container.appendChild(visualSection);
             }
         }
 
@@ -428,10 +472,26 @@
             div.className = 'media-item';
             div.id = `media-item-${item.id}`;
             
+            // Build title with author
+            let titleDisplay = item.title;
+            if (item.author) titleDisplay += ` - ${item.author}`;
+            if (item.volume_episode) titleDisplay += ` (${item.volume_episode})`;
+            
+            // Get media type emoji and label
+            const typeInfo = {
+                'book': '📖 Książka',
+                'comic': '📰 Komiks',
+                'movie': '🎬 Film',
+                'series': '📺 Serial',
+                'anime': '🎌 Anime',
+                'cartoon': '🎨 Bajka'
+            };
+            const typeLabel = typeInfo[item.media_type] || item.media_type;
+            
             const content = `
                 <div class="media-item-view" id="view-${item.id}">
                     <div class="media-item-header">
-                        <strong>${item.title}</strong>
+                        <strong>${titleDisplay}</strong>
                         <div class="media-item-buttons">
                             <button data-action="addAgain" data-id="${item.id}" class="action-btn" title="Dodaj ponownie (re-watch/re-read)">Dodaj ponownie</button>
                             <button data-action="editMedia" data-id="${item.id}" class="action-btn">Edytuj</button>
@@ -439,10 +499,12 @@
                         </div>
                     </div>
                     <div class="media-item-details">
+                        <span>${typeLabel}</span>
                         <span>Od: ${formatDate(item.start_date)}</span>
                         <span>Do: ${formatDate(item.end_date)}</span>
                         <span>${calculateDays(item.start_date, item.end_date)} dni</span>
                     </div>
+                    ${item.tags ? `<div class="media-item-tags">🏷️ ${item.tags}</div>` : ''}
                     ${item.notes ? `<div class="media-item-notes">${item.notes}</div>` : ''}
                 </div>
                 <div class="media-item-edit" id="edit-${item.id}" style="display: none;">
@@ -452,11 +514,23 @@
                             <input type="text" id="edit-title-${item.id}" value="${item.title}" />
                         </div>
                         <div class="form-group">
+                            <label>Autor:</label>
+                            <input type="text" id="edit-author-${item.id}" value="${item.author || ''}" />
+                        </div>
+                        <div class="form-group">
                             <label>Typ:</label>
                             <select id="edit-type-${item.id}">
-                                <option value="book" ${item.media_type === 'book' ? 'selected' : ''}>Książka</option>
-                                <option value="series" ${item.media_type === 'series' ? 'selected' : ''}>Serial/Film</option>
+                                <option value="book" ${item.media_type === 'book' ? 'selected' : ''}>📖 Książka</option>
+                                <option value="comic" ${item.media_type === 'comic' ? 'selected' : ''}>📰 Komiks</option>
+                                <option value="movie" ${item.media_type === 'movie' ? 'selected' : ''}>🎬 Film</option>
+                                <option value="series" ${item.media_type === 'series' ? 'selected' : ''}>📺 Serial</option>
+                                <option value="anime" ${item.media_type === 'anime' ? 'selected' : ''}>🎌 Anime</option>
+                                <option value="cartoon" ${item.media_type === 'cartoon' ? 'selected' : ''}>🎨 Bajka</option>
                             </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Tom/Odcinek:</label>
+                            <input type="text" id="edit-volume-${item.id}" value="${item.volume_episode || ''}" />
                         </div>
                         <div class="form-group">
                             <label>Data rozpoczęcia:</label>
@@ -465,6 +539,10 @@
                         <div class="form-group">
                             <label>Data zakończenia:</label>
                             <input type="date" id="edit-end-${item.id}" value="${item.end_date}" />
+                        </div>
+                        <div class="form-group">
+                            <label>Tagi:</label>
+                            <input type="text" id="edit-tags-${item.id}" value="${item.tags || ''}" />
                         </div>
                         <div class="form-group">
                             <label>Notatki:</label>
@@ -500,9 +578,12 @@
             
             const formData = {
                 title: document.getElementById('title').value,
+                author: document.getElementById('author').value,
                 media_type: document.getElementById('mediaType').value,
+                volume_episode: document.getElementById('volumeEpisode').value,
                 start_date: document.getElementById('startDate').value,
                 end_date: document.getElementById('endDate').value,
+                tags: document.getElementById('tags').value,
                 notes: document.getElementById('notes').value
             };
             
@@ -566,9 +647,12 @@
         async function updateMedia(id) {
             const formData = {
                 title: document.getElementById(`edit-title-${id}`).value,
+                author: document.getElementById(`edit-author-${id}`).value,
                 media_type: document.getElementById(`edit-type-${id}`).value,
+                volume_episode: document.getElementById(`edit-volume-${id}`).value,
                 start_date: document.getElementById(`edit-start-${id}`).value,
                 end_date: document.getElementById(`edit-end-${id}`).value,
+                tags: document.getElementById(`edit-tags-${id}`).value,
                 notes: document.getElementById(`edit-notes-${id}`).value
             };
             
@@ -607,22 +691,25 @@
                 toggleIcon.textContent = '▲';
             }
             
-            // Pre-fill form with title and type, but clear dates and notes
+            // Pre-fill form with title, author, and type, but clear dates, volume, tags, and notes
             document.getElementById('title').value = item.title;
+            document.getElementById('author').value = item.author || '';
             document.getElementById('mediaType').value = item.media_type;
+            document.getElementById('volumeEpisode').value = '';
             document.getElementById('startDate').value = '';
             document.getElementById('endDate').value = '';
+            document.getElementById('tags').value = '';
             document.getElementById('notes').value = '';
             
             // Scroll to form
             document.querySelector('.add-media-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
             
-            // Focus on start date input
+            // Focus on volume/episode or start date input
             setTimeout(() => {
-                document.getElementById('startDate').focus();
+                document.getElementById('volumeEpisode').focus();
             }, 500);
             
-            showToast('Formularz wypełniony - wybierz nowe daty', 'success');
+            showToast('Formularz wypełniony - wybierz nowe daty i ewentualnie tom/odcinek', 'success');
         }
 
         // Event delegation for all click events

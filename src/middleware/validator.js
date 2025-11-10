@@ -18,12 +18,30 @@ export const validateMediaCreation = [
     .isLength({ max: 255 })
     .withMessage('Title must be less than 255 characters')
     .escape(),
+  body('author')
+    .optional()
+    .trim()
+    .isLength({ max: 255 })
+    .withMessage('Author must be less than 255 characters')
+    .escape(),
   body('media_type')
     .trim()
     .notEmpty()
     .withMessage('Media type is required')
-    .isIn(['book', 'series'])
-    .withMessage('Media type must be either "book" or "series"'),
+    .isIn(['book', 'comic', 'movie', 'series', 'anime', 'cartoon'])
+    .withMessage('Media type must be one of: book, comic, movie, series, anime, cartoon'),
+  body('volume_episode')
+    .optional()
+    .trim()
+    .isLength({ max: 100 })
+    .withMessage('Volume/Episode must be less than 100 characters')
+    .escape(),
+  body('tags')
+    .optional()
+    .trim()
+    .isLength({ max: 500 })
+    .withMessage('Tags must be less than 500 characters')
+    .escape(),
   body('start_date')
     .trim()
     .notEmpty()
@@ -99,12 +117,30 @@ export const validateMediaUpdate = [
     .isLength({ max: 255 })
     .withMessage('Title must be less than 255 characters')
     .escape(),
+  body('author')
+    .optional()
+    .trim()
+    .isLength({ max: 255 })
+    .withMessage('Author must be less than 255 characters')
+    .escape(),
   body('media_type')
     .trim()
     .notEmpty()
     .withMessage('Media type is required')
-    .isIn(['book', 'series'])
-    .withMessage('Media type must be either "book" or "series"'),
+    .isIn(['book', 'comic', 'movie', 'series', 'anime', 'cartoon'])
+    .withMessage('Media type must be one of: book, comic, movie, series, anime, cartoon'),
+  body('volume_episode')
+    .optional()
+    .trim()
+    .isLength({ max: 100 })
+    .withMessage('Volume/Episode must be less than 100 characters')
+    .escape(),
+  body('tags')
+    .optional()
+    .trim()
+    .isLength({ max: 500 })
+    .withMessage('Tags must be less than 500 characters')
+    .escape(),
   body('start_date')
     .trim()
     .notEmpty()

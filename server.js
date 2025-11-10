@@ -56,9 +56,12 @@ async function initDb() {
         CREATE TABLE IF NOT EXISTS media (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           title TEXT NOT NULL,
+          author TEXT,
           media_type TEXT NOT NULL,
           start_date TEXT NOT NULL,
           end_date TEXT NOT NULL,
+          volume_episode TEXT,
+          tags TEXT,
           notes TEXT,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -99,7 +102,7 @@ app.get(
 
       const entries = await db.all(
         `
-        SELECT id, title, media_type, start_date, end_date, notes
+        SELECT id, title, author, media_type, start_date, end_date, volume_episode, tags, notes
         FROM media
         WHERE strftime('%Y', start_date) = ? OR strftime('%Y', end_date) = ?
         OR (strftime('%Y', start_date) < ? AND strftime('%Y', end_date) > ?)
@@ -123,11 +126,11 @@ app.post(
   validateMediaCreation,
   async (req, res) => {
     try {
-      const { title, media_type, start_date, end_date, notes = '' } = req.body;
+      const { title, author = '', media_type, start_date, end_date, volume_episode = '', tags = '', notes = '' } = req.body;
 
       const result = await db.run(
-        'INSERT INTO media (title, media_type, start_date, end_date, notes) VALUES (?, ?, ?, ?, ?)',
-        [title, media_type, start_date, end_date, notes]
+        'INSERT INTO media (title, author, media_type, start_date, end_date, volume_episode, tags, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        [title, author, media_type, start_date, end_date, volume_episode, tags, notes]
       );
 
       logger.info(`Created media entry: ${title} (ID: ${result.lastID})`);
@@ -150,11 +153,11 @@ app.put(
   async (req, res) => {
     try {
       const mediaId = parseInt(req.params.id);
-      const { title, media_type, start_date, end_date, notes = '' } = req.body;
+      const { title, author = '', media_type, start_date, end_date, volume_episode = '', tags = '', notes = '' } = req.body;
 
       const result = await db.run(
-        'UPDATE media SET title = ?, media_type = ?, start_date = ?, end_date = ?, notes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-        [title, media_type, start_date, end_date, notes, mediaId]
+        'UPDATE media SET title = ?, author = ?, media_type = ?, start_date = ?, end_date = ?, volume_episode = ?, tags = ?, notes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+        [title, author, media_type, start_date, end_date, volume_episode, tags, notes, mediaId]
       );
 
       if (result.changes === 0) {
@@ -208,7 +211,7 @@ app.get('/api/media', async (req, res) => {
 
     const entries = await db.all(
       `
-      SELECT id, title, media_type, start_date, end_date, notes
+      SELECT id, title, author, media_type, start_date, end_date, volume_episode, tags, notes
       FROM media
       WHERE strftime('%Y', start_date) = ? OR strftime('%Y', end_date) = ?
       OR (strftime('%Y', start_date) < ? AND strftime('%Y', end_date) > ?)
@@ -226,16 +229,17 @@ app.get('/api/media', async (req, res) => {
 
 app.post('/api/media', async (req, res) => {
   try {
-    const { title, media_type, start_date, end_date, notes = '' } = req.body;
+    const { title, author = '', media_type, start_date, end_date, volume_episode = '', tags = '', notes = '' } = req.body;
 
     // Basic validation
     if (!title || !media_type || !start_date || !end_date) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    if (!['book', 'series'].includes(media_type)) {
+    const validTypes = ['book', 'series', 'comic', 'movie', 'anime', 'cartoon'];
+    if (!validTypes.includes(media_type)) {
       return res.status(400).json({
-        error: 'Invalid media type. Must be "book" or "series"',
+        error: 'Invalid media type. Must be one of: book, comic, movie, series, anime, cartoon',
       });
     }
 
@@ -248,8 +252,8 @@ app.post('/api/media', async (req, res) => {
     }
 
     const result = await db.run(
-      'INSERT INTO media (title, media_type, start_date, end_date, notes) VALUES (?, ?, ?, ?, ?)',
-      [title, media_type, start_date, end_date, notes]
+      'INSERT INTO media (title, author, media_type, start_date, end_date, volume_episode, tags, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [title, author, media_type, start_date, end_date, volume_episode, tags, notes]
     );
 
     res.status(201).json({
@@ -270,16 +274,17 @@ app.put('/api/media/:id', async (req, res) => {
       return res.status(400).json({ error: 'Invalid media ID' });
     }
 
-    const { title, media_type, start_date, end_date, notes = '' } = req.body;
+    const { title, author = '', media_type, start_date, end_date, volume_episode = '', tags = '', notes = '' } = req.body;
 
     // Basic validation
     if (!title || !media_type || !start_date || !end_date) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    if (!['book', 'series'].includes(media_type)) {
+    const validTypes = ['book', 'series', 'comic', 'movie', 'anime', 'cartoon'];
+    if (!validTypes.includes(media_type)) {
       return res.status(400).json({
-        error: 'Invalid media type. Must be "book" or "series"',
+        error: 'Invalid media type. Must be one of: book, comic, movie, series, anime, cartoon',
       });
     }
 
@@ -292,8 +297,8 @@ app.put('/api/media/:id', async (req, res) => {
     }
 
     const result = await db.run(
-      'UPDATE media SET title = ?, media_type = ?, start_date = ?, end_date = ?, notes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-      [title, media_type, start_date, end_date, notes, mediaId]
+      'UPDATE media SET title = ?, author = ?, media_type = ?, start_date = ?, end_date = ?, volume_episode = ?, tags = ?, notes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      [title, author, media_type, start_date, end_date, volume_episode, tags, notes, mediaId]
     );
 
     if (result.changes === 0) {

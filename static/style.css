@@ -242,7 +242,6 @@ header h1 {
 }
 
 .day.has-media {
-    background: #667eea;
     color: white;
     font-weight: bold;
     cursor: pointer;
@@ -252,6 +251,35 @@ header h1 {
 .day.has-media:hover {
     transform: scale(1.15);
     z-index: 10;
+}
+
+/* Color coding for different media types */
+.day.media-book {
+    background: #8b5cf6; /* Purple for books */
+}
+
+.day.media-comic {
+    background: #f97316; /* Orange for comics */
+}
+
+.day.media-movie {
+    background: #3b82f6; /* Blue for movies */
+}
+
+.day.media-series {
+    background: #10b981; /* Green for series */
+}
+
+.day.media-anime {
+    background: #ec4899; /* Pink for anime */
+}
+
+.day.media-cartoon {
+    background: #eab308; /* Yellow for cartoons */
+}
+
+.day.media-mixed {
+    background: linear-gradient(135deg, #8b5cf6 0%, #3b82f6 50%, #10b981 100%);
 }
 
 .media-list-section {

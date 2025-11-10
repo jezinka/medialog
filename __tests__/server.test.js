@@ -26,9 +26,12 @@ beforeAll(async () => {
         CREATE TABLE IF NOT EXISTS media (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             title TEXT NOT NULL,
+            author TEXT,
             media_type TEXT NOT NULL,
             start_date TEXT NOT NULL,
             end_date TEXT NOT NULL,
+            volume_episode TEXT,
+            tags TEXT,
             notes TEXT,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
