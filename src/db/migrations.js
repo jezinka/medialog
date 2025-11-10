@@ -188,12 +188,16 @@ export async function migrateToManyToManyTags(db) {
     `);
 
     // Migrate existing tags from media table if exists
-    if (tableNames.includes('media')) {
-      logger.info('Migrating existing tag data...');
+    // Check both media and media_old (in case normalization migration ran first)
+    const sourceTable = tableNames.includes('media') ? 'media' : 
+                       tableNames.includes('media_old') ? 'media_old' : null;
+    
+    if (sourceTable) {
+      logger.info(`Migrating existing tag data from ${sourceTable}...`);
 
       // Get all media entries with tags
       const mediaWithTags = await db.all(
-        'SELECT id, tags FROM media WHERE tags IS NOT NULL AND tags != ""'
+        `SELECT id, tags FROM ${sourceTable} WHERE tags IS NOT NULL AND tags != ""`
       );
 
       let migratedTagsCount = 0;
