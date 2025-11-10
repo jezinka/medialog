@@ -1,0 +1,93 @@
+{
+  "items": [
+    {
+      "title": "Wiedźmin: Ostatnie życzenie",
+      "author": "Andrzej Sapkowski",
+      "media_type": "book",
+      "start_date": "2025-01-01",
+      "end_date": "2025-01-10",
+      "tags": "fantasy, polish, sword and sorcery",
+      "notes": "Pierwszy tom opowiadań o Wiedźminie"
+    },
+    {
+      "title": "Wiedźmin: Miecz przeznaczenia",
+      "author": "Andrzej Sapkowski",
+      "media_type": "book",
+      "start_date": "2025-01-11",
+      "end_date": "2025-01-20",
+      "tags": "fantasy, polish, sword and sorcery",
+      "notes": "Drugi tom opowiadań"
+    },
+    {
+      "title": "Wiedźmin: Krew elfów",
+      "author": "Andrzej Sapkowski",
+      "media_type": "book",
+      "start_date": "2025-01-21",
+      "end_date": "2025-02-01",
+      "tags": "fantasy, polish, saga",
+      "notes": "Pierwszy tom sagi"
+    },
+    {
+      "title": "Stranger Things - Season 1",
+      "media_type": "series",
+      "start_date": "2025-02-05",
+      "end_date": "2025-02-08",
+      "volume_episode": "Season 1",
+      "tags": "scifi, horror, netflix",
+      "notes": "Świetny serial o dzieciach i nadprzyrodzonych wydarzeniach"
+    },
+    {
+      "title": "The Matrix",
+      "media_type": "movie",
+      "start_date": "2025-02-10",
+      "end_date": "2025-02-10",
+      "tags": "scifi, action, cyberpunk",
+      "notes": "Kultowy film o rzeczywistości wirtualnej"
+    },
+    {
+      "title": "Attack on Titan",
+      "media_type": "anime",
+      "start_date": "2025-02-15",
+      "end_date": "2025-03-01",
+      "volume_episode": "Season 1",
+      "tags": "action, dark fantasy, shounen",
+      "notes": "Epickie anime o tytanach"
+    },
+    {
+      "title": "One Piece",
+      "author": "Eiichiro Oda",
+      "media_type": "comic",
+      "start_date": "2025-03-05",
+      "volume_episode": "Vol. 1-10",
+      "tags": "adventure, shounen, pirates",
+      "notes": "Manga o poszukiwaniu skarbu One Piece"
+    },
+    {
+      "title": "Rick and Morty - Season 1",
+      "media_type": "cartoon",
+      "start_date": "2025-03-20",
+      "end_date": "2025-03-25",
+      "volume_episode": "Season 1",
+      "tags": "scifi, comedy, adult animation",
+      "notes": "Szalony serial animowany dla dorosłych"
+    },
+    {
+      "title": "Dune",
+      "author": "Frank Herbert",
+      "media_type": "book",
+      "start_date": "2025-04-01",
+      "end_date": "2025-04-20",
+      "tags": "scifi, space opera, classic",
+      "notes": "Klasyka science fiction"
+    },
+    {
+      "title": "Breaking Bad - Season 1",
+      "media_type": "series",
+      "start_date": "2025-04-25",
+      "end_date": "2025-05-05",
+      "volume_episode": "Season 1",
+      "tags": "drama, crime, thriller",
+      "notes": "Historia nauczyciela chemii i metamfetaminy"
+    }
+  ]
+}

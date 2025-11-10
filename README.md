@@ -95,6 +95,9 @@ medialog/
 │   └── index.html     # Szablon strony głównej
 ├── static/
 │   └── style.css      # Style CSS
+├── examples/          # Przykłady użycia API (bulk insert)
+│   ├── README.md      # Instrukcje użycia
+│   └── bulk-insert-example.json  # Przykładowe dane
 └── medialog.db        # Baza danych (tworzona automatycznie)
 ```
 
