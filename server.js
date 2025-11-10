@@ -317,6 +317,7 @@ app.post(
       await db.run('BEGIN TRANSACTION');
 
       try {
+        // Safe: items.length is validated to be <= 200 by validateBulkMediaCreation middleware
         for (let i = 0; i < items.length; i++) {
           const item = items[i];
           const { 
@@ -562,6 +563,7 @@ app.post('/api/media/bulk', async (req, res) => {
       const validTypes = ['book', 'series', 'comic', 'movie', 'anime', 'cartoon'];
       const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
 
+      // Safe: items.length is validated to be <= 200 by the check above (line 548)
       for (let i = 0; i < items.length; i++) {
         const item = items[i];
         const { 
