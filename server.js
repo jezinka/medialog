@@ -13,6 +13,7 @@ import {
   validateMediaDeletion,
   validateMediaQuery,
 } from './src/middleware/validator.js';
+import { runMigrations } from './src/db/migrations.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -136,6 +137,9 @@ async function initDb() {
         }
       }
 
+      // Run database migrations
+      await runMigrations(db);
+
       logger.info('Database initialized successfully');
     } catch (error) {
       logger.error('Failed to initialize database:', error);
@@ -147,6 +151,71 @@ async function initDb() {
 
 function setDb(database) {
   db = database;
+}
+
+// Helper functions for tag management
+async function getMediaTags(mediaId) {
+  const tags = await db.all(
+    `SELECT t.id, t.name FROM tags t
+     INNER JOIN media_tags mt ON t.id = mt.tag_id
+     WHERE mt.media_id = ?
+     ORDER BY t.name`,
+    [mediaId]
+  );
+  return tags;
+}
+
+async function setMediaTags(mediaId, tagNames) {
+  // Remove existing tags for this media
+  await db.run('DELETE FROM media_tags WHERE media_id = ?', [mediaId]);
+
+  // If no tags provided, return
+  if (!tagNames || tagNames.length === 0) {
+    return;
+  }
+
+  // Process each tag
+  for (const tagName of tagNames) {
+    const trimmedTag = tagName.trim().toLowerCase();
+    if (trimmedTag.length === 0) continue;
+
+    // Get or create tag
+    let tag = await db.get('SELECT id FROM tags WHERE name = ?', [trimmedTag]);
+    if (!tag) {
+      const result = await db.run('INSERT INTO tags (name) VALUES (?)', [
+        trimmedTag,
+      ]);
+      tag = { id: result.lastID };
+    }
+
+    // Create media_tags relationship
+    try {
+      await db.run('INSERT INTO media_tags (media_id, tag_id) VALUES (?, ?)', [
+        mediaId,
+        tag.id,
+      ]);
+    } catch (err) {
+      // Ignore duplicate entries
+      if (!err.message.includes('UNIQUE constraint failed')) {
+        throw err;
+      }
+    }
+  }
+}
+
+async function parseTagsInput(tagsInput) {
+  // Accept both array and string (comma-separated)
+  if (Array.isArray(tagsInput)) {
+    return tagsInput
+      .map((tag) => tag.trim().toLowerCase())
+      .filter((tag) => tag.length > 0);
+  } else if (typeof tagsInput === 'string') {
+    return tagsInput
+      .split(',')
+      .map((tag) => tag.trim().toLowerCase())
+      .filter((tag) => tag.length > 0);
+  }
+  return [];
 }
 
 // Routes
@@ -181,6 +250,13 @@ app.get(
         [String(year), String(year), String(year), String(year), String(year)]
       );
 
+      // Fetch tags for each entry
+      for (const entry of entries) {
+        const mediaTags = await getMediaTags(entry.id);
+        // Return tags as comma-separated string for backward compatibility
+        entry.tags = mediaTags.map((t) => t.name).join(', ');
+      }
+
       logger.info(`Fetched ${entries.length} media entries for year ${year}`);
       res.json(entries);
     } catch (error) {
@@ -199,14 +275,20 @@ app.post(
       const { title, author = '', media_type, start_date, end_date, volume_episode = '', tags = '', notes = '', discontinued = false } = req.body;
 
       const result = await db.run(
-        'INSERT INTO media (title, author, media_type, start_date, end_date, volume_episode, tags, notes, discontinued) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [title, author, media_type, start_date, end_date, volume_episode, tags, notes, discontinued ? 1 : 0]
+        'INSERT INTO media (title, author, media_type, start_date, end_date, volume_episode, notes, discontinued) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [title, author, media_type, start_date, end_date, volume_episode, notes, discontinued ? 1 : 0]
       );
 
-      logger.info(`Created media entry: ${title} (ID: ${result.lastID})`);
+      const mediaId = result.lastID;
+
+      // Handle tags using new many-to-many structure
+      const tagNames = await parseTagsInput(tags);
+      await setMediaTags(mediaId, tagNames);
+
+      logger.info(`Created media entry: ${title} (ID: ${mediaId})`);
 
       res.status(201).json({
-        id: result.lastID,
+        id: mediaId,
         message: 'Media entry added successfully',
       });
     } catch (error) {
@@ -226,14 +308,18 @@ app.put(
       const { title, author = '', media_type, start_date, end_date, volume_episode = '', tags = '', notes = '', discontinued = false } = req.body;
 
       const result = await db.run(
-        'UPDATE media SET title = ?, author = ?, media_type = ?, start_date = ?, end_date = ?, volume_episode = ?, tags = ?, notes = ?, discontinued = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-        [title, author, media_type, start_date, end_date, volume_episode, tags, notes, discontinued ? 1 : 0, mediaId]
+        'UPDATE media SET title = ?, author = ?, media_type = ?, start_date = ?, end_date = ?, volume_episode = ?, notes = ?, discontinued = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+        [title, author, media_type, start_date, end_date, volume_episode, notes, discontinued ? 1 : 0, mediaId]
       );
 
       if (result.changes === 0) {
         logger.warn(`Media entry not found for update: ID ${mediaId}`);
         return res.status(404).json({ error: 'Media entry not found' });
       }
+
+      // Handle tags using new many-to-many structure
+      const tagNames = await parseTagsInput(tags);
+      await setMediaTags(mediaId, tagNames);
 
       logger.info(`Updated media entry: ${title} (ID: ${mediaId})`);
       res.json({ message: 'Media entry updated successfully' });
@@ -268,6 +354,21 @@ app.delete(
   }
 );
 
+// Get all tags
+app.get(`${API_PREFIX}/tags`, async (req, res) => {
+  try {
+    const tags = await db.all(
+      'SELECT id, name FROM tags ORDER BY name'
+    );
+
+    logger.info(`Fetched ${tags.length} tags`);
+    res.json(tags);
+  } catch (error) {
+    logger.error('Error fetching tags:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
@@ -291,6 +392,13 @@ app.get('/api/media', async (req, res) => {
     `,
       [String(year), String(year), String(year), String(year), String(year)]
     );
+
+    // Fetch tags for each entry
+    for (const entry of entries) {
+      const mediaTags = await getMediaTags(entry.id);
+      // Return tags as comma-separated string for backward compatibility
+      entry.tags = mediaTags.map((t) => t.name).join(', ');
+    }
 
     res.json(entries);
   } catch (error) {
@@ -324,12 +432,18 @@ app.post('/api/media', async (req, res) => {
     }
 
     const result = await db.run(
-      'INSERT INTO media (title, author, media_type, start_date, end_date, volume_episode, tags, notes, discontinued) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [title, author, media_type, start_date, end_date, volume_episode, tags, notes, discontinued ? 1 : 0]
+      'INSERT INTO media (title, author, media_type, start_date, end_date, volume_episode, notes, discontinued) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [title, author, media_type, start_date, end_date, volume_episode, notes, discontinued ? 1 : 0]
     );
 
+    const mediaId = result.lastID;
+
+    // Handle tags using new many-to-many structure
+    const tagNames = await parseTagsInput(tags);
+    await setMediaTags(mediaId, tagNames);
+
     res.status(201).json({
-      id: result.lastID,
+      id: mediaId,
       message: 'Media entry added successfully',
     });
   } catch (error) {
@@ -369,13 +483,17 @@ app.put('/api/media/:id', async (req, res) => {
     }
 
     const result = await db.run(
-      'UPDATE media SET title = ?, author = ?, media_type = ?, start_date = ?, end_date = ?, volume_episode = ?, tags = ?, notes = ?, discontinued = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-      [title, author, media_type, start_date, end_date, volume_episode, tags, notes, discontinued ? 1 : 0, mediaId]
+      'UPDATE media SET title = ?, author = ?, media_type = ?, start_date = ?, end_date = ?, volume_episode = ?, notes = ?, discontinued = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      [title, author, media_type, start_date, end_date, volume_episode, notes, discontinued ? 1 : 0, mediaId]
     );
 
     if (result.changes === 0) {
       return res.status(404).json({ error: 'Media entry not found' });
     }
+
+    // Handle tags using new many-to-many structure
+    const tagNames = await parseTagsInput(tags);
+    await setMediaTags(mediaId, tagNames);
 
     res.json({ message: 'Media entry updated successfully' });
   } catch (error) {
@@ -451,4 +569,4 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   startServer();
 }
 
-export { app, initDb, startServer, setDb };
+export { app, initDb, startServer, setDb, getMediaTags, setMediaTags, parseTagsInput };
