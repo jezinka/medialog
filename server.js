@@ -12,6 +12,7 @@ import {
   validateMediaUpdate,
   validateMediaDeletion,
   validateMediaQuery,
+  validateBulkMediaCreation,
 } from './src/middleware/validator.js';
 import { runMigrations } from './src/db/migrations.js';
 
@@ -37,7 +38,7 @@ app.use(
 );
 
 // Standard middleware
-app.use(express.json({ limit: '10kb' })); // Limit payload size
+app.use(express.json({ limit: '1mb' })); // Limit payload size (increased for bulk operations)
 app.use(express.static('static'));
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'templates'));
@@ -275,7 +276,7 @@ app.post(
       const { title, author = '', media_type, start_date, end_date, volume_episode = '', tags = '', notes = '', discontinued = false } = req.body;
 
       const result = await db.run(
-        'INSERT INTO media (title, author, media_type, start_date, end_date, volume_episode, notes, discontinued) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO media (title, author, media_type, start_date, end_date, volume_episode, notes, discontinued) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
         [title, author, media_type, start_date, end_date, volume_episode, notes, discontinued ? 1 : 0]
       );
 
@@ -294,6 +295,88 @@ app.post(
     } catch (error) {
       logger.error('Error adding media:', error);
       res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+);
+
+// Bulk insert endpoint
+app.post(
+  `${API_PREFIX}/media/bulk`,
+  writeApiLimiter,
+  validateBulkMediaCreation,
+  async (req, res) => {
+    try {
+      const { items } = req.body;
+      const results = {
+        success: [],
+        failed: [],
+        total: items.length,
+      };
+
+      // Begin transaction for atomic bulk insert
+      await db.run('BEGIN TRANSACTION');
+
+      try {
+        for (let i = 0; i < items.length; i++) {
+          const item = items[i];
+          const { 
+            title, 
+            author = '', 
+            media_type, 
+            start_date, 
+            end_date = null, 
+            volume_episode = '', 
+            tags = '', 
+            notes = '', 
+            discontinued = false 
+          } = item;
+
+          try {
+            // Insert media entry
+            const result = await db.run(
+              'INSERT INTO media (title, author, media_type, start_date, end_date, volume_episode, notes, discontinued) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+              [title, author, media_type, start_date, end_date, volume_episode, notes, discontinued ? 1 : 0]
+            );
+
+            const mediaId = result.lastID;
+
+            // Handle tags
+            const tagNames = await parseTagsInput(tags);
+            await setMediaTags(mediaId, tagNames);
+
+            results.success.push({
+              index: i,
+              id: mediaId,
+              title: title,
+            });
+          } catch (itemError) {
+            logger.error(`Error inserting item at index ${i}:`, itemError);
+            results.failed.push({
+              index: i,
+              title: title,
+              error: itemError.message,
+            });
+          }
+        }
+
+        // Commit transaction if all succeeded or partial success is acceptable
+        await db.run('COMMIT');
+        
+        const statusCode = results.failed.length === 0 ? 201 : 207; // 207 = Multi-Status
+        logger.info(`Bulk insert completed: ${results.success.length} succeeded, ${results.failed.length} failed`);
+        
+        res.status(statusCode).json({
+          message: `Bulk insert completed: ${results.success.length}/${results.total} succeeded`,
+          results: results,
+        });
+      } catch (error) {
+        // Rollback on error
+        await db.run('ROLLBACK');
+        throw error;
+      }
+    } catch (error) {
+      logger.error('Error in bulk insert:', error);
+      res.status(500).json({ error: 'Internal server error during bulk insert' });
     }
   }
 );
@@ -432,7 +515,7 @@ app.post('/api/media', async (req, res) => {
     }
 
     const result = await db.run(
-      'INSERT INTO media (title, author, media_type, start_date, end_date, volume_episode, notes, discontinued) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO media (title, author, media_type, start_date, end_date, volume_episode, notes, discontinued) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       [title, author, media_type, start_date, end_date, volume_episode, notes, discontinued ? 1 : 0]
     );
 
@@ -449,6 +532,109 @@ app.post('/api/media', async (req, res) => {
   } catch (error) {
     logger.error('Error adding media:', error);
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Backward compatibility: Bulk insert endpoint
+app.post('/api/media/bulk', async (req, res) => {
+  try {
+    const { items } = req.body;
+
+    // Basic validation
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: 'Items must be a non-empty array' });
+    }
+
+    if (items.length > 200) {
+      return res.status(400).json({ error: 'Cannot insert more than 200 items at once' });
+    }
+
+    const results = {
+      success: [],
+      failed: [],
+      total: items.length,
+    };
+
+    // Begin transaction for atomic bulk insert
+    await db.run('BEGIN TRANSACTION');
+
+    try {
+      const validTypes = ['book', 'series', 'comic', 'movie', 'anime', 'cartoon'];
+      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        const { 
+          title, 
+          author = '', 
+          media_type, 
+          start_date, 
+          end_date = null, 
+          volume_episode = '', 
+          tags = '', 
+          notes = '', 
+          discontinued = false 
+        } = item;
+
+        try {
+          // Basic validation for each item
+          if (!title || !media_type || !start_date) {
+            throw new Error('Missing required fields: title, media_type, or start_date');
+          }
+
+          if (!validTypes.includes(media_type)) {
+            throw new Error(`Invalid media type: ${media_type}`);
+          }
+
+          if (!dateRegex.test(start_date) || (end_date && !dateRegex.test(end_date))) {
+            throw new Error('Invalid date format. Use YYYY-MM-DD');
+          }
+
+          // Insert media entry
+          const result = await db.run(
+            'INSERT INTO media (title, author, media_type, start_date, end_date, volume_episode, notes, discontinued) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            [title, author, media_type, start_date, end_date, volume_episode, notes, discontinued ? 1 : 0]
+          );
+
+          const mediaId = result.lastID;
+
+          // Handle tags
+          const tagNames = await parseTagsInput(tags);
+          await setMediaTags(mediaId, tagNames);
+
+          results.success.push({
+            index: i,
+            id: mediaId,
+            title: title,
+          });
+        } catch (itemError) {
+          logger.error(`Error inserting item at index ${i}:`, itemError);
+          results.failed.push({
+            index: i,
+            title: title || 'Unknown',
+            error: itemError.message,
+          });
+        }
+      }
+
+      // Commit transaction
+      await db.run('COMMIT');
+      
+      const statusCode = results.failed.length === 0 ? 201 : 207; // 207 = Multi-Status
+      logger.info(`Bulk insert completed: ${results.success.length} succeeded, ${results.failed.length} failed`);
+      
+      res.status(statusCode).json({
+        message: `Bulk insert completed: ${results.success.length}/${results.total} succeeded`,
+        results: results,
+      });
+    } catch (error) {
+      // Rollback on error
+      await db.run('ROLLBACK');
+      throw error;
+    }
+  } catch (error) {
+    logger.error('Error in bulk insert:', error);
+    res.status(500).json({ error: 'Internal server error during bulk insert' });
   }
 });
 

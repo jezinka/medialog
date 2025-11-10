@@ -120,6 +120,53 @@ Przykładowe dane:
 ### DELETE /api/media/<id>
 Usuwa wpis o podanym ID.
 
+### POST /api/media/bulk
+Dodaje wiele wpisów naraz (bulk insert). Pozwala na szybkie dodanie do 200 pozycji w jednej operacji.
+
+Przykładowe dane:
+```json
+{
+  "items": [
+    {
+      "title": "Wiedźmin",
+      "media_type": "book",
+      "start_date": "2024-01-15",
+      "end_date": "2024-02-10",
+      "author": "Andrzej Sapkowski",
+      "notes": "Bardzo dobra książka"
+    },
+    {
+      "title": "Stranger Things",
+      "media_type": "series",
+      "start_date": "2024-02-15",
+      "end_date": "2024-02-20",
+      "notes": "Świetny serial"
+    }
+  ]
+}
+```
+
+Odpowiedź:
+```json
+{
+  "message": "Bulk insert completed: 2/2 succeeded",
+  "results": {
+    "success": [
+      { "index": 0, "id": 1, "title": "Wiedźmin" },
+      { "index": 1, "id": 2, "title": "Stranger Things" }
+    ],
+    "failed": [],
+    "total": 2
+  }
+}
+```
+
+Uwagi:
+- Maksymalnie 200 wpisów w jednej operacji
+- Wszystkie wpisy są przetwarzane w ramach jednej transakcji
+- Jeśli część wpisów się nie powiedzie, reszta zostanie dodana (status 207)
+- Możliwe pola dla każdego wpisu: `title`, `author`, `media_type`, `start_date`, `end_date`, `volume_episode`, `tags`, `notes`, `discontinued`
+
 ## Licencja
 
 MIT

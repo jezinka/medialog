@@ -667,4 +667,257 @@ describe('Media Log API', () => {
             expect(book.tags.split(', ').sort()).toEqual(['adventure', 'fantasy', 'scifi']);
         });
     });
+
+    describe('Bulk Insert', () => {
+        it('should insert multiple media entries at once', async () => {
+            const items = [
+                {
+                    title: 'Book 1',
+                    media_type: 'book',
+                    start_date: '2025-01-01',
+                    end_date: '2025-01-10',
+                    author: 'Author 1',
+                    notes: 'First book'
+                },
+                {
+                    title: 'Book 2',
+                    media_type: 'book',
+                    start_date: '2025-01-15',
+                    end_date: '2025-01-25',
+                    author: 'Author 2',
+                    notes: 'Second book'
+                },
+                {
+                    title: 'Series 1',
+                    media_type: 'series',
+                    start_date: '2025-02-01',
+                    end_date: '2025-02-10',
+                    notes: 'A series'
+                }
+            ];
+
+            const response = await request(app)
+                .post('/api/media/bulk')
+                .send({ items });
+
+            expect(response.status).toBe(201);
+            expect(response.body.results.success).toHaveLength(3);
+            expect(response.body.results.failed).toHaveLength(0);
+            expect(response.body.results.total).toBe(3);
+            expect(response.body.message).toContain('3/3 succeeded');
+
+            // Verify all items were inserted
+            const mediaResponse = await request(app).get('/api/media?year=2025');
+            expect(mediaResponse.body).toHaveLength(3);
+        });
+
+        it('should handle bulk insert with tags', async () => {
+            const items = [
+                {
+                    title: 'Tagged Book 1',
+                    media_type: 'book',
+                    start_date: '2025-03-01',
+                    end_date: '2025-03-10',
+                    tags: 'fantasy, adventure'
+                },
+                {
+                    title: 'Tagged Book 2',
+                    media_type: 'book',
+                    start_date: '2025-03-15',
+                    end_date: '2025-03-25',
+                    tags: 'scifi, thriller'
+                }
+            ];
+
+            const response = await request(app)
+                .post('/api/media/bulk')
+                .send({ items });
+
+            expect(response.status).toBe(201);
+            expect(response.body.results.success).toHaveLength(2);
+
+            // Verify tags were created
+            const mediaResponse = await request(app).get('/api/media?year=2025');
+            const book1 = mediaResponse.body.find(e => e.title === 'Tagged Book 1');
+            const book2 = mediaResponse.body.find(e => e.title === 'Tagged Book 2');
+
+            expect(book1.tags.split(', ').sort()).toEqual(['adventure', 'fantasy']);
+            expect(book2.tags.split(', ').sort()).toEqual(['scifi', 'thriller']);
+        });
+
+        it('should handle bulk insert with some failures', async () => {
+            const items = [
+                {
+                    title: 'Valid Book',
+                    media_type: 'book',
+                    start_date: '2025-04-01',
+                    end_date: '2025-04-10'
+                },
+                {
+                    title: 'Invalid Book',
+                    media_type: 'invalid_type',
+                    start_date: '2025-04-15',
+                    end_date: '2025-04-25'
+                },
+                {
+                    title: 'Another Valid Book',
+                    media_type: 'book',
+                    start_date: '2025-05-01',
+                    end_date: '2025-05-10'
+                }
+            ];
+
+            const response = await request(app)
+                .post('/api/media/bulk')
+                .send({ items });
+
+            expect(response.status).toBe(207); // Multi-Status
+            expect(response.body.results.success).toHaveLength(2);
+            expect(response.body.results.failed).toHaveLength(1);
+            expect(response.body.results.total).toBe(3);
+            expect(response.body.results.failed[0].index).toBe(1);
+            expect(response.body.results.failed[0].error).toContain('Invalid media type');
+
+            // Verify valid items were inserted
+            const mediaResponse = await request(app).get('/api/media?year=2025');
+            const validBook = mediaResponse.body.find(e => e.title === 'Valid Book');
+            const anotherValidBook = mediaResponse.body.find(e => e.title === 'Another Valid Book');
+            const invalidBook = mediaResponse.body.find(e => e.title === 'Invalid Book');
+
+            expect(validBook).toBeDefined();
+            expect(anotherValidBook).toBeDefined();
+            expect(invalidBook).toBeUndefined();
+        });
+
+        it('should reject empty array', async () => {
+            const response = await request(app)
+                .post('/api/media/bulk')
+                .send({ items: [] });
+
+            expect(response.status).toBe(400);
+            expect(response.body.error).toContain('non-empty array');
+        });
+
+        it('should reject non-array items', async () => {
+            const response = await request(app)
+                .post('/api/media/bulk')
+                .send({ items: 'not an array' });
+
+            expect(response.status).toBe(400);
+        });
+
+        it('should reject more than 200 items', async () => {
+            const items = Array(201).fill({
+                title: 'Test Book',
+                media_type: 'book',
+                start_date: '2025-01-01',
+                end_date: '2025-01-10'
+            });
+
+            const response = await request(app)
+                .post('/api/media/bulk')
+                .send({ items });
+
+            expect(response.status).toBe(400);
+            expect(response.body.error).toContain('200 items');
+        });
+
+        it('should handle bulk insert with discontinued entries', async () => {
+            const items = [
+                {
+                    title: 'Discontinued Book',
+                    media_type: 'book',
+                    start_date: '2025-06-01',
+                    end_date: '2025-06-05',
+                    discontinued: true
+                },
+                {
+                    title: 'Regular Book',
+                    media_type: 'book',
+                    start_date: '2025-06-10',
+                    end_date: '2025-06-20',
+                    discontinued: false
+                }
+            ];
+
+            const response = await request(app)
+                .post('/api/media/bulk')
+                .send({ items });
+
+            expect(response.status).toBe(201);
+            expect(response.body.results.success).toHaveLength(2);
+
+            // Verify discontinued status
+            const mediaResponse = await request(app).get('/api/media?year=2025');
+            const discontinuedBook = mediaResponse.body.find(e => e.title === 'Discontinued Book');
+            const regularBook = mediaResponse.body.find(e => e.title === 'Regular Book');
+
+            expect(discontinuedBook.discontinued).toBe(1);
+            expect(regularBook.discontinued).toBe(0);
+        });
+
+        it('should insert 100 items efficiently', async () => {
+            const items = [];
+            for (let i = 1; i <= 100; i++) {
+                items.push({
+                    title: `Book ${i}`,
+                    media_type: 'book',
+                    start_date: '2025-07-01',
+                    end_date: '2025-07-10',
+                    author: `Author ${i}`,
+                    notes: `Test book number ${i}`
+                });
+            }
+
+            const startTime = Date.now();
+            const response = await request(app)
+                .post('/api/media/bulk')
+                .send({ items });
+            const endTime = Date.now();
+
+            expect(response.status).toBe(201);
+            expect(response.body.results.success).toHaveLength(100);
+            expect(response.body.results.failed).toHaveLength(0);
+            expect(response.body.results.total).toBe(100);
+
+            // Should complete in reasonable time (less than 10 seconds)
+            const duration = endTime - startTime;
+            expect(duration).toBeLessThan(10000);
+
+            // Verify all items were inserted
+            const mediaResponse = await request(app).get('/api/media?year=2025');
+            expect(mediaResponse.body.length).toBeGreaterThanOrEqual(100);
+        });
+
+        it('should handle optional end_date in bulk insert', async () => {
+            const items = [
+                {
+                    title: 'Book with end date',
+                    media_type: 'book',
+                    start_date: '2025-08-01',
+                    end_date: '2025-08-10'
+                },
+                {
+                    title: 'Book without end date',
+                    media_type: 'book',
+                    start_date: '2025-08-15'
+                }
+            ];
+
+            const response = await request(app)
+                .post('/api/media/bulk')
+                .send({ items });
+
+            expect(response.status).toBe(201);
+            expect(response.body.results.success).toHaveLength(2);
+
+            // Verify entries
+            const mediaResponse = await request(app).get('/api/media?year=2025');
+            const withEndDate = mediaResponse.body.find(e => e.title === 'Book with end date');
+            const withoutEndDate = mediaResponse.body.find(e => e.title === 'Book without end date');
+
+            expect(withEndDate.end_date).toBe('2025-08-10');
+            expect(withoutEndDate.end_date).toBeNull();
+        });
+    });
 });
