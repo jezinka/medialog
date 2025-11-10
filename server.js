@@ -59,7 +59,7 @@ async function initDb() {
           author TEXT,
           media_type TEXT NOT NULL,
           start_date TEXT NOT NULL,
-          end_date TEXT NOT NULL,
+          end_date TEXT,
           volume_episode TEXT,
           tags TEXT,
           notes TEXT,
@@ -86,10 +86,54 @@ async function initDb() {
         await db.exec('ALTER TABLE media ADD COLUMN tags TEXT');
         logger.info('Added tags column to media table');
       }
-      
+
       if (!columnNames.includes('discontinued')) {
         await db.exec('ALTER TABLE media ADD COLUMN discontinued INTEGER DEFAULT 0');
         logger.info('Added discontinued column to media table');
+      }
+
+      // Migration: Make end_date nullable
+      // Check if end_date is NOT NULL by checking table structure
+      const endDateColumn = tableInfo.find(col => col.name === 'end_date');
+      if (endDateColumn && endDateColumn.notnull === 1) {
+        logger.info('Migrating to make end_date nullable...');
+        await db.exec('BEGIN TRANSACTION');
+        try {
+          // Create new table with nullable end_date
+          await db.exec(`
+            CREATE TABLE media_new (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              title TEXT NOT NULL,
+              author TEXT,
+              media_type TEXT NOT NULL,
+              start_date TEXT NOT NULL,
+              end_date TEXT,
+              volume_episode TEXT,
+              tags TEXT,
+              notes TEXT,
+              created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+              updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+          `);
+
+          // Copy data from old table to new table
+          await db.exec(`
+            INSERT INTO media_new (id, title, author, media_type, start_date, end_date, volume_episode, tags, notes, created_at, updated_at)
+            SELECT id, title, author, media_type, start_date, end_date, volume_episode, tags, notes, created_at, updated_at
+            FROM media
+          `);
+
+          // Drop old table and rename new table
+          await db.exec('DROP TABLE media');
+          await db.exec('ALTER TABLE media_new RENAME TO media');
+
+          await db.exec('COMMIT');
+          logger.info('Successfully migrated end_date to nullable');
+        } catch (error) {
+          await db.exec('ROLLBACK');
+          logger.error('Failed to migrate end_date:', error);
+          throw error;
+        }
       }
 
       logger.info('Database initialized successfully');
@@ -128,11 +172,13 @@ app.get(
         `
         SELECT id, title, author, media_type, start_date, end_date, volume_episode, tags, notes, discontinued
         FROM media
-        WHERE strftime('%Y', start_date) = ? OR strftime('%Y', end_date) = ?
-        OR (strftime('%Y', start_date) < ? AND strftime('%Y', end_date) > ?)
+        WHERE strftime('%Y', start_date) = ? 
+        OR (end_date IS NOT NULL AND strftime('%Y', end_date) = ?)
+        OR (end_date IS NOT NULL AND strftime('%Y', start_date) < ? AND strftime('%Y', end_date) > ?)
+        OR (end_date IS NULL AND strftime('%Y', start_date) = ?)
         ORDER BY start_date
       `,
-        [String(year), String(year), String(year), String(year)]
+        [String(year), String(year), String(year), String(year), String(year)]
       );
 
       logger.info(`Fetched ${entries.length} media entries for year ${year}`);
@@ -237,11 +283,13 @@ app.get('/api/media', async (req, res) => {
       `
       SELECT id, title, author, media_type, start_date, end_date, volume_episode, tags, notes, discontinued
       FROM media
-      WHERE strftime('%Y', start_date) = ? OR strftime('%Y', end_date) = ?
-      OR (strftime('%Y', start_date) < ? AND strftime('%Y', end_date) > ?)
+      WHERE strftime('%Y', start_date) = ? 
+      OR (end_date IS NOT NULL AND strftime('%Y', end_date) = ?)
+      OR (end_date IS NOT NULL AND strftime('%Y', start_date) < ? AND strftime('%Y', end_date) > ?)
+      OR (end_date IS NULL AND strftime('%Y', start_date) = ?)
       ORDER BY start_date
     `,
-      [String(year), String(year), String(year), String(year)]
+      [String(year), String(year), String(year), String(year), String(year)]
     );
 
     res.json(entries);
@@ -253,10 +301,10 @@ app.get('/api/media', async (req, res) => {
 
 app.post('/api/media', async (req, res) => {
   try {
-    const { title, author = '', media_type, start_date, end_date, volume_episode = '', tags = '', notes = '', discontinued = false } = req.body;
+    const { title, author = '', media_type, start_date, end_date = null, volume_episode = '', tags = '', notes = '', discontinued = false } = req.body;
 
     // Basic validation
-    if (!title || !media_type || !start_date || !end_date) {
+    if (!title || !media_type || !start_date) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
@@ -269,7 +317,7 @@ app.post('/api/media', async (req, res) => {
 
     // Validate date format
     const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-    if (!dateRegex.test(start_date) || !dateRegex.test(end_date)) {
+    if (!dateRegex.test(start_date) || (end_date && !dateRegex.test(end_date))) {
       return res.status(400).json({
         error: 'Invalid date format. Use YYYY-MM-DD',
       });
@@ -298,10 +346,10 @@ app.put('/api/media/:id', async (req, res) => {
       return res.status(400).json({ error: 'Invalid media ID' });
     }
 
-    const { title, author = '', media_type, start_date, end_date, volume_episode = '', tags = '', notes = '', discontinued = false } = req.body;
+    const { title, author = '', media_type, start_date, end_date = null, volume_episode = '', tags = '', notes = '', discontinued = false } = req.body;
 
     // Basic validation
-    if (!title || !media_type || !start_date || !end_date) {
+    if (!title || !media_type || !start_date) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
@@ -314,7 +362,7 @@ app.put('/api/media/:id', async (req, res) => {
 
     // Validate date format
     const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-    if (!dateRegex.test(start_date) || !dateRegex.test(end_date)) {
+    if (!dateRegex.test(start_date) || (end_date && !dateRegex.test(end_date))) {
       return res.status(400).json({
         error: 'Invalid date format. Use YYYY-MM-DD',
       });
