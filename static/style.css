@@ -354,6 +354,41 @@ header h1 {
     border-top: 1px solid #ddd;
 }
 
+/* Discontinued media styles */
+.media-item-view.discontinued {
+    opacity: 0.7;
+    background: linear-gradient(to right, #f7f7f7 0%, #ffe6e6 100%);
+}
+
+.discontinued-badge {
+    background: #e74c3c;
+    color: white;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: bold;
+    margin-left: 10px;
+}
+
+/* Checkbox label styles */
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.checkbox-label input[type="checkbox"] {
+    cursor: pointer;
+    width: 18px;
+    height: 18px;
+}
+
+.checkbox-label span {
+    font-weight: normal;
+}
+
 .empty-message {
     text-align: center;
     color: #999;
