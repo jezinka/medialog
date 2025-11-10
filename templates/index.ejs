@@ -534,7 +534,7 @@
                         <span>${typeLabel}</span>
                         <span>Od: ${formatDate(item.start_date)}</span>
                         <span>Do: ${formatDate(item.end_date)}</span>
-                        <span>${calculateDays(item.start_date, item.end_date)} dni</span>
+                        <span>${item.end_date ? calculateDays(item.start_date, item.end_date) + ' dni' : 'W trakcie'}</span>
                     </div>
                     ${item.tags ? `<div class="media-item-tags">🏷️ ${item.tags}</div>` : ''}
                     ${item.notes ? `<div class="media-item-notes">${item.notes}</div>` : ''}
@@ -605,7 +605,6 @@
         }
 
         function calculateDays(startStr, endStr) {
-            if (!endStr) return 'W trakcie';
             const start = new Date(startStr);
             const end = new Date(endStr);
             const diffTime = Math.abs(end - start);
